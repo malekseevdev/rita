@@ -12,7 +12,7 @@ keep that in mind when proposing changes.
     Include enough context that a reader can judge whether the
     gap warrants new framework surface area or whether the
     existing framework already covers it under a different name.
--   **Script bug** (`scripts/check.py` does the wrong thing) —
+-   **Script bug** (`scripts/drift_check.py` does the wrong thing) —
     open an issue with the command you ran, expected output,
     observed output, and your Python version.
 
@@ -32,7 +32,7 @@ PR:
 4.  In the PR description, name the load-bearing argument from
     `rationale.md` that the rest of the change implements.
 
-For script changes (`scripts/check.py` or future scripts), keep
+For script changes (`scripts/drift_check.py` or future scripts), keep
 the stdlib-only constraint.  Third-party dependencies need a
 strong argument and should be raised in an issue first.
 

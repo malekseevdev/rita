@@ -1,14 +1,15 @@
 ---
+name: rita-plan
 description: Use when the user asks to plan or ship a non-trivial feature. Skip for bug fixes, dependency bumps, refactors, and other small or already-documented work.
 ---
 
-# Rita: feature planning and shipping
+# Rita: plan (and ship) a feature
 
 This skill drives the Rita framework for non-trivial feature
 work.  The `docs/` and `templates/` referenced below live
 alongside this `SKILL.md`, in the same skill directory
-(typically `~/.claude/skills/rita-feature/` for a user-level
-install, or `<project>/.claude/skills/rita-feature/` for a
+(typically `~/.claude/skills/rita-plan/` for a user-level
+install, or `<project>/.claude/skills/rita-plan/` for a
 project-scoped install).
 
 When invoked, **read these two files once at the start of the
@@ -73,7 +74,7 @@ cp -r <skill-dir>/templates <component>/docs/features/<TICKET-ID>-<slug>/
 ```
 
 `<skill-dir>` is the directory containing this `SKILL.md` —
-typically `~/.claude/skills/rita-feature/`.  Then set the
+typically `~/.claude/skills/rita-plan/`.  Then set the
 frontmatter in the new `README.md` (Ticket, `Status: Plan`,
 `Last reviewed: <today>`).  Don't fill in the body yet —
 how-to.md's Phase 1 directs what to fill where.
@@ -87,13 +88,27 @@ The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
     Why, Options considered + Preferred.
--   Phase 2 (*Feasibility check*) → one block per load-bearing
-    assumption in `feasibility.md`.  Don't continue if any
-    block has *Observed exit ≠ Expected exit* — loop back to
-    phase 1 with a different option.
+-   Phase 2 (*Feasibility check*) → verify only the *genuinely
+    uncertain* (usually external) load-bearing assumptions; don't
+    prototype-and-test code the plan will ship, and don't verify the
+    self-evident — many features need no verified block.  A check you
+    *ran* that fails (*Observed ≠ Expected*) → loop back to phase 1.  An
+    assumption you can't verify (infra, production, a human answer) does
+    not block — flag it and write the full plan anyway.
 -   Phase 3 (*Plan review*) → fill in `plan.md`, then run the
-    three-pass review.  The agent self-review pass is your job;
-    do it before asking the human to look at anything.
+    **self-improvement loop**: have a **subagent** review the feature
+    folder — a fresh context, so the review reads what's on the page, not
+    your authoring rationale.  The subagent only *reviews* (it returns
+    findings, it doesn't edit); **you then apply them** — edit the docs to
+    resolve each improvement and failed check it reports.  **One** revision
+    pass (the cap is two plan iterations: the initial draft plus one fix;
+    a safety guard against churning), *then* hand to the human author/peer
+    passes.  Spawn the subagent with
+    the Agent/Task tool and have it run the `rita-review` skill on the
+    folder — as listed in your available skills, normally `/rita-review
+    <folder>`, or `/<prefix>rita-review <folder>` under the prefix this
+    skill carries; if it can't invoke the skill, it reads that skill's
+    `RUBRIC.md` and the docs and returns the same scorecard + improvements.
 
 Once approved, the path is linear:
 
@@ -104,7 +119,7 @@ Once approved, the path is linear:
     `plan.md`.
 -   Phase 6 (*Maintain*) is invoked separately, not as part of
     the initial shipping session.  When the user asks you to
-    check a feature later — drift detection (`scripts/check.py`),
+    check a feature later — drift detection (`scripts/drift_check.py`),
     metric health, runbook freshness — see how-to.md Phase 6
     for what to do.
 
@@ -141,9 +156,9 @@ surfacing rather than just the diff:
     most-fabricated artifact in agent-drafted plans; surfacing
     them gives the user a focused point to spot-check before
     the rest of the plan is written.
--   At the end of *Plan review* self-review (phase 3): emit
-    the explicit checklist from
-    `docs/how-to.md#pass-1-agent-self-review` with pass/fail
-    per item.  This is the artifact the author reviewer uses
-    to decide whether to look at the doc or send it back for
-    fixes.
+-   At the end of *Plan review* (phase 3): emit `rita-review`'s
+    output — the self-review checklist (pass/fail), the drift
+    result, and the scorecard — plus what you changed in
+    response across the loop.  This is the artifact the human
+    reviewer uses to decide whether to look at the doc or send
+    it back for fixes.

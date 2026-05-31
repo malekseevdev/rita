@@ -123,11 +123,13 @@ on a handful of recurring pain points:
 
 ## Status
 
-Production-ready once the first worked example lands — until
-then, treat as a release candidate.  Framework documentation,
-templates, the drift-detection script, and the Claude Code skill
-are stable.  Additional scripts (feasibility verification, ship,
-lint) and harness integrations beyond Claude Code are TODO.
+Release candidate.  Framework documentation, templates, the
+drift-detection script, the Claude Code skills (`rita-plan`,
+`rita-review`), and a worked example
+([`examples/search-rate-limit/`](examples/search-rate-limit/)) with
+end-to-end tests ([`tests/e2e/`](tests/e2e/)) are stable.  Additional
+scripts (feasibility verification, ship, lint) and harness integrations
+beyond Claude Code are TODO.
 
 ## Getting started
 
@@ -137,23 +139,38 @@ lint) and harness integrations beyond Claude Code are TODO.
     git clone https://github.com/malekseevdev/rita.git
     ```
 
-2.  Install the Claude Code skill:
+2.  Install the Claude Code skills (`rita-plan`, `rita-review`):
 
     ```bash
     cd rita
-    ./install-claude-skill.sh              # user-level — available in every project
+    ./install-claude-skills.sh              # user-level — available in every project
     # or
-    ./install-claude-skill.sh /path/to/your-project   # project-scoped
+    ./install-claude-skills.sh /path/to/your-project   # project-scoped
     ```
 
     For other agent harnesses (Cursor, Continue, etc.) see
     [`skills/README.md`](skills/README.md) — the harness-agnostic
     agent prompt points your agent at the clone's path.
 
-3.  When you have a non-trivial feature to plan, ask your agent
-    to start working with Rita.  It bootstraps the feature
-    folder, fills in what it can derive from the ticket and the
-    codebase, and surfaces clarifying questions.
+3.  When you have a non-trivial feature to plan, invoke the
+    **`rita-plan`** skill in Claude Code:
+
+    ```
+    /rita-plan the feature in TICKET-123
+    ```
+
+    It bootstraps the feature folder, fills in what it can derive
+    from the ticket and the codebase, and surfaces clarifying
+    questions.
+
+    Once a plan exists, grade it with the **`rita-review`** skill:
+
+    ```
+    /rita-review docs/features/RITA-1-rate-limit-search
+    ```
+
+    — a rubric scorecard (8 dimensions + letter grade) with
+    concrete improvement suggestions.
 
 The full procedural reference the agent follows is in
 [`docs/how-to.md`](docs/how-to.md).
@@ -168,25 +185,16 @@ team is ready for it.
 
 ## What's here
 
-Organised by adoption level — start with the minimum, add the rest
-when you want the operational depth.
-
-**Minimum viable (~10 min to try):**
-
-| Path | Purpose |
-|---|---|
-| [`docs/how-to.md`](docs/how-to.md) | The procedural reference.  *What each file owns* and *Feasibility check* sections cover the two minimum-viable practices; rest is optional. |
-| [`templates/feasibility.md`](templates/feasibility.md) | The feasibility-block skeleton — copy this into your feature folder; record the critical assumptions the plan depends on. |
-
-**Full framework (the operational depth):**
-
 | Path | Purpose |
 |---|---|
 | [`docs/framework.md`](docs/framework.md) | Entry point — lifecycle diagram, "When to skip", pointers to how-to and rationale. |
+| [`docs/how-to.md`](docs/how-to.md) | The procedural reference the agent follows — what each file owns, the feasibility check, the review passes. |
 | [`docs/rationale.md`](docs/rationale.md) | **Explanation.**  Why Rita is shaped this way — philosophy, lessons, agent-participation patterns.  Read narratively. |
-| [`templates/`](templates/) | All six copy-and-fill skeletons (README, feasibility, plan, test-cases, metrics, runbook). |
-| [`skills/`](skills/) | Agent-harness integrations.  Claude Code skill + harness-agnostic agent prompt — ships.  Cursor, Continue, etc. — TODO. |
-| [`scripts/check.py`](scripts/check.py) | Drift detection.  Python 3.9+ stdlib, runs against `<root>/**/docs/features/`. |
+| [`templates/`](templates/) | The six doc skeletons (README, feasibility, plan, test-cases, metrics, runbook) the `rita-plan` skill fills in. |
+| [`skills/`](skills/) | Agent-harness integrations.  Claude Code skills (`rita-plan` to plan, `rita-review` to grade a plan) + harness-agnostic agent prompt — ships.  Cursor, Continue, etc. — TODO. |
+| [`scripts/drift_check.py`](scripts/drift_check.py) | Drift detection.  Python 3.9+ stdlib, runs against `<root>/**/docs/features/`. |
+| [`examples/search-rate-limit/`](examples/search-rate-limit/) | Worked example — a complete feature doc set (also the eval/demo fixture). |
+| [`tests/e2e/`](tests/e2e/) | End-to-end tests: drift detection, and skill-driven plan generation + scoring.  See [Testing](#testing). |
 | `scripts/feasibility_verify.py`, `ship.py`, `lint.py` | TODO — automated feasibility re-execution, ship-time ephemeral trim, structural lint. |
 
 ## Rita vs. ADRs, RFCs, design docs
@@ -211,6 +219,24 @@ optimises for greenfield agent-heavy work; Rita optimises for
 long-lived production systems where on-call is downstream of the
 docs.  Different diagnoses, different fits.
 
+## Testing
+
+End-to-end tests live in [`tests/e2e/`](tests/e2e/) (see its README for
+detail):
+
+- **`test_drift.sh`** — offline and deterministic.  Builds a
+  self-contained throwaway git repo (a doc linking a tiny code file) and
+  checks that `scripts/drift_check.py` reports clean docs as OK and post-review
+  code changes as stale; also sanity-checks the committed example parses.
+- **`test_claude.sh`** — drives the `rita-plan` skill headlessly via
+  `claude -p` to generate a plan from a ticket, then scores it with the
+  `rita-review` skill.  Costs API budget; pick the model with `--model`.
+
+**Requirements:** `test_drift.sh` needs Python 3.9+ and Git.
+`test_claude.sh` additionally needs the [`claude`](https://claude.com/claude-code)
+CLI with working auth and `python3` (small bundled helpers parse the
+CLI's stream-json output — no `jq` or other third-party tools required).
+
 ## Requirements
 
 To use the framework: an AI agent (Claude Code, Cursor, or any
@@ -219,7 +245,7 @@ reference in [`docs/how-to.md`](docs/how-to.md)).  Nothing to
 install.
 
 To run the optional drift-detection script
-([`scripts/check.py`](scripts/check.py)): Python 3.9+ (stdlib
+([`scripts/drift_check.py`](scripts/drift_check.py)): Python 3.9+ (stdlib
 only, no third-party dependencies) and Git.
 
 ## License

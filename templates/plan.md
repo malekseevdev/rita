@@ -8,11 +8,12 @@ verifications live in [`feasibility.md`](feasibility.md) (evergreen).
 This file is the working scratchpad — implementation logistics that
 don't outlive the launch.
 
-**Don't draft anything below until every block in
-[`feasibility.md`](feasibility.md) has *Observed exit == Expected
-exit*.**  If a load-bearing assumption fails and there's no working
-alternative, rework `README.md`'s "Options considered" section
-instead of writing the rest of this plan.
+If a feasibility check you *ran* fails (*Observed ≠ Expected*) and there's
+no working alternative, don't draft the rest of this plan — rework
+`README.md`'s "Options considered" instead.  Assumptions that simply
+*can't be verified yet* (infra, production, a human answer) do **not**
+block: they're flagged in [`feasibility.md`](feasibility.md), and you
+write the full plan around them so the reviewer gets a complete artifact.
 
 ## Implementation steps
 

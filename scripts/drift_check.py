@@ -6,7 +6,7 @@ Walks <root>/**/docs/features/*/ folders and reports docs whose
 any code file the doc links to.
 
 Usage:
-    python scripts/check.py [--root .] [--fail-after DAYS]
+    python scripts/drift_check.py [--root .] [--fail-after DAYS]
 
 Exit codes:
     0 — no rot beyond the threshold

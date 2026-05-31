@@ -73,7 +73,7 @@ rule lives in [`rationale.md#drafting-pitfalls`](rationale.md#drafting-pitfalls)
 ## 1. Plan options
 
 Bootstrap a feature folder if you haven't already — either via
-your agent harness's skill install (the rita-feature skill
+your agent harness's skill install (the rita-plan skill
 handles this automatically) or by manually copying
 [`../templates/`](../templates/) into
 `<component>/docs/features/<TICKET-ID>-<slug>/`.  Set the
@@ -153,15 +153,63 @@ plus a **`Proxy-gap:`** line stating what the proxy doesn't cover:
   the production prefix is not exercised by this proxy.
 ```
 
-**Termination rule:** if *Observed exit ≠ Expected exit* and
-there's no working alternative, loop back to section 1.  Pick a
-different *Preferred* option (or close the ticket).  Don't
-continue to section 3.
+**Feasibility verifies *uncertainty*, not your own code.**  A block
+earns its place only when the outcome is genuinely in doubt — usually
+because it depends on something *external*: a library or version's
+behaviour, an API's response, a platform capability, the shape or scale
+of real data, a service you don't control.  The test: *could a competent
+engineer be confidently wrong about this without checking?*  If yes,
+verify it here.
+
+If the only way to "verify" an assumption is to write the very code the
+plan will ship — a token bucket enforces its limit, a lock prevents lost
+updates, your parser rejects bad input — that's not a feasibility check,
+it's a **test**.  It belongs in [`test-cases.md`](test-cases.md) and is
+written with the implementation, not prototyped now.  Prototyping and
+testing your own design at plan time produces blocks that look rigorous
+but verify nothing you were unsure of.
+
+Two more traps produce official-looking but worthless blocks:
+
+-   **Verifying the self-evident.**  "The stdlib provides `threading`
+    and `time`", "the language has dictionaries", "a lock gives mutual
+    exclusion" — no competent engineer is unsure of these.  A block
+    whose *Expected* outcome was never in doubt is noise, not signal.
+    Don't write it.
+-   **Local-proxying a production fact.**  If the real uncertainty is
+    about the deployed environment (interpreter version, worker count, a
+    service you don't run) and your command runs on your *planning box*,
+    it proves nothing about production — the proxy doesn't cover the
+    actual unknown.  That's a `:warning: needs human input` flag, not a
+    verified block.
+
+It is entirely normal — the common case, even — for a self-contained
+feature to end up with **zero verified blocks**: just a short list of
+flagged external unknowns, or nothing at all.  That is the honest
+result, and it scores well; don't manufacture a block to fill the
+section.  Reach for a verified block only when you have a genuine,
+externally-uncertain assumption you can check *cheaply and meaningfully*
+up front — the PostgreSQL example above is the model; "stdlib has
+`time.monotonic`" is not.
+
+**What blocks, and what doesn't.**  A verification you *ran* that came
+back *Observed ≠ Expected* kills the approach: stop, loop back to
+section 1, pick a different *Preferred* option (or close the ticket) —
+don't write the rest of the plan on a broken assumption.  But an
+assumption you *can't* verify now — it needs production access, infra, a
+complex setup, or a human answer — does **not** block.  Flag it
+(`:warning: needs human input`) and **write the full plan anyway**: a
+complete plan with clearly-flagged open assumptions is far more useful to
+a reviewer (and to the human who can resolve them) than a plan that halts
+at this section waiting for infrastructure.  Only a *failed* check sends
+you back to options; an *unverifiable* one travels with the plan as a
+flag.
 
 ## 3. Plan review
 
-Once every feasibility block has *Observed exit == Expected exit*,
-fill in `plan.md`:
+Once no *ran* feasibility check is failing — verified blocks pass, and
+the assumptions you couldn't check are flagged rather than blocking (see
+above) — fill in `plan.md`:
 
 -   *Implementation steps* — ordered; mark partial-value milestones.
 -   *Concerns* — concrete assessment per item (performance,
@@ -236,30 +284,32 @@ the lighter end, agent self-review plus peer review may be
 enough — the author and peer reviewer can be the same person.
 Pick the rigour to match the risk.
 
-#### Pass 1 — agent self-review
+#### Pass 1 — agent self-review (the self-improvement loop)
 
-Before any human sees the draft, the agent re-reads its own work.
-The job is mechanical alignment with the framework, not judgment.
-Output a short report of what was checked and any items that
-failed:
+Before any human sees the draft, the agent verifies its own work and
+improves it in a short loop — no human in the loop yet:
 
--   [ ] Every section per [What each file owns](#what-each-file-owns)
-    is filled in (no skipped sections).
--   [ ] Every [drafting rule](#drafting-rules) was applied — for
-    each rule, name where it applies in the draft (or note that
-    it doesn't apply and why).
--   [ ] All `:warning: needs human input` markers have a one-line
-    note explaining what's missing.
--   [ ] Clarifying questions are surfaced in a single grouped
-    block (scoped, informed, grouped), not scattered.
--   [ ] `feasibility.md` is complete — every load-bearing
-    assumption has a block with *Observed exit == Expected exit*.
--   [ ] Cross-file references are consistent — no contradictions
-    between `README.md`, `feasibility.md`, `plan.md`, `metrics.md`.
+1.  **Review (clean-room).**  Have a **fresh-context reviewer** run the
+    **`rita-review`** skill on the feature folder — in Claude Code, spawn
+    a subagent (Agent/Task tool) so the review reads only what's on the
+    page, not your authoring rationale; other harnesses use an
+    independent re-read or a second reviewer.  `rita-review` performs a
+    mechanical self-review checklist (sections filled, drafting rules
+    applied, feasibility honest, unknowns flagged, cross-file
+    consistency), a drift check, and a rubric scorecard, and lists
+    concrete improvements.
+2.  **Improve.**  Address the improvements and any failed checklist
+    items — edit the docs, don't argue with the review.
+3.  **Stop after one revision.**  Cap the loop at **two plan iterations**
+    — the initial draft plus a single review-and-fix pass — then hand to
+    the human passes even if minor improvements remain (author and peer
+    catch the rest).  The hard cap is a safety guard against churning.
+    Genuine `:warning: needs human input` items don't block; they travel
+    to the human as open questions.
 
-If anything fails, fix it before handing off.  If a rule
-genuinely doesn't apply, say so explicitly — silent omission
-reads as oversight.
+`rita-review` is the single home for the self-review criteria — see that
+skill (and the rubric it applies) for the full checklist; this keeps the
+"what an agent can check itself" definition in one place.
 
 #### Pass 2 — author review
 
@@ -397,7 +447,7 @@ rot:
 Run the drift-detection script:
 
 ```bash
-python /path/to/rita/scripts/check.py --root . --fail-after 90
+python /path/to/rita/scripts/drift_check.py --root . --fail-after 90
 ```
 
 The script walks `<root>/**/docs/features/*/README.md`, parses

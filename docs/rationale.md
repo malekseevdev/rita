@@ -94,6 +94,23 @@ Hand-written plans had it too, but humans tend to hedge with
 "we should check that this works"; agents don't, by default.
 The format makes the check non-optional.
 
+The same instinct has a failure mode worth naming: a feasibility
+check is only worth writing when the outcome is genuinely
+*uncertain* — typically because it depends on something external
+(a version's behaviour, an API, a platform, real data, a service
+you don't own).  When a feature is self-contained and built on
+well-understood in-house mechanics, agents (being eager to look
+rigorous) tend to *prototype the implementation and unit-test it*,
+then file that as feasibility.  Those blocks verify nothing anyone
+was unsure of — "a token bucket enforces its limit", "a lock
+prevents lost updates" — and they duplicate what `test-cases.md`
+will cover once the code exists.  The discipline is to verify
+uncertainty, not to re-prove textbook code: if checking an
+assumption means writing the very code the plan will ship, it's a
+test, and a feature with no real external unknown is allowed an
+almost-empty feasibility section.  Padding it with prototype-tests
+is the confident-rigour analogue of confident hallucination.
+
 ### Why feasibility lives in its own file
 
 Verifications are a distinct kind of content from the rest of the
@@ -528,7 +545,7 @@ consistency across the codebase — the metric *names* and tag
 -   When a feature is significantly reshaped, treat it as a new
     feature: new plan, new review.
 
-The intent of automated rot detection (`scripts/check.py`) is
+The intent of automated rot detection (`scripts/drift_check.py`) is
 **soft pressure, not blocking enforcement** — a stale doc is
 rarely an incident, but a year of drift is.
 

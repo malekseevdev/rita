@@ -15,41 +15,43 @@ The install commands below assume you're inside the cloned
 
 ## Claude Code
 
-[`claude-code/rita-feature/`](claude-code/rita-feature/) is a
-Claude Code skill.  The skill folder contains the `SKILL.md`
-plus symlinks to Rita's `docs/` and `templates/` directories, so
-the install copies everything the agent needs in one shot.
+Two Claude Code skills live under [`claude-code/`](claude-code/):
 
-Install with the helper script from the repo root:
+- [`rita-plan/`](claude-code/rita-plan/) — plan and ship a
+  non-trivial feature through the Rita lifecycle.  Its folder bundles
+  `SKILL.md` plus symlinks to Rita's `docs/` and `templates/`.
+- [`rita-review/`](claude-code/rita-review/) — grade an existing Rita
+  feature folder against the shared `RUBRIC.md` and print a scorecard.
+  Useful before review, or to compare plans from different models.
+
+Install both with the helper script from the repo root:
 
 ```bash
-./install-claude-skill.sh                       # user-level: ~/.claude/skills/rita-feature/
-./install-claude-skill.sh /path/to/your-project # project-scoped: <project>/.claude/skills/rita-feature/
+./install-claude-skills.sh                       # user-level: ~/.claude/skills/
+./install-claude-skills.sh /path/to/your-project # project-scoped: <project>/.claude/skills/
 ```
 
-The default (no argument) installs to `~/.claude/skills/`, where
-the skill is available in every project on this host.  Pass an
-explicit project directory to scope the install to that project
-only.  Either way, the script resolves the `docs/` and
-`templates/` symlinks at copy time so the installed skill folder
-is self-contained.
+The default (no argument) installs to `~/.claude/skills/`, where the
+skills are available in every project on this host.  Pass an explicit
+project directory to scope the install to that project only.  Either way,
+the script resolves the `docs/` and `templates/` symlinks at copy time so
+each installed skill folder is self-contained.
 
-If you'd rather skip the script, the equivalent one-liner is:
+If you'd rather skip the script, the equivalent one-liner per skill is:
 
 ```bash
-cp -rL skills/claude-code/rita-feature <your-project>/.claude/skills/
+cp -rL skills/claude-code/rita-plan <your-project>/.claude/skills/
 ```
 
 The `-L` flag is the load-bearing part — it resolves the
 symlinks so the copied skill folder no longer depends on the
 location of the Rita repo.
 
-Then in Claude Code, invoke the skill when starting a
-non-trivial feature task.
+Then in Claude Code, invoke `rita-plan` when starting a non-trivial
+feature task, or `rita-review` to grade a plan.
 
-To update an installed skill when Rita changes, just re-run the
-installer — it replaces any existing `rita-feature` at the
-target.
+To update installed skills when Rita changes, just re-run the
+installer — it replaces any existing skills at the target.
 
 ## Generic agent prompt
 
