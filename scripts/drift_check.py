@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 """Rita drift detection.
 
-Walks <root>/**/docs/features/*/ folders and reports docs whose
-`Last reviewed:` date is older than the most recent commit touching
-any code file the doc links to.
+Two passes over <root>/**/docs/features/*/ feature folders:
+
+  * Date drift (always) — reports docs whose `Last reviewed:` date is
+    older than the most recent commit touching any code file the doc
+    links to.
+  * Referential integrity (--refs) — extracts identifiers the docs
+    assert exist in code (backticked metric names, env vars, and
+    FEATURE_*/KILL_* flags) and reports the ones it can't find anywhere
+    in the tree outside the feature docs.  These are *candidates to
+    verify*, not confirmed gaps: an identifier can be built at runtime
+    (a metric name assembled from a prefix, a flag read via a constant)
+    and so be real yet unfindable by literal search.
 
 Usage:
-    python scripts/drift_check.py [--root .] [--fail-after DAYS]
+    python scripts/drift_check.py [--root .] [--fail-after DAYS] [--refs]
 
 Exit codes:
-    0 — no rot beyond the threshold
+    0 — no date drift beyond the threshold
     1 — at least one doc is stale beyond --fail-after
+        (the --refs pass is advisory and never changes the exit code)
 """
 
 from __future__ import annotations
@@ -92,6 +102,93 @@ def check_doc(doc: Path) -> tuple[dt.date | None, list[tuple[Path, dt.date]]]:
     return review, stale
 
 
+# --- Referential integrity (--refs) --------------------------------------
+# Identifiers the docs assert exist in code.  We extract conservatively —
+# only backticked tokens that look like code identifiers, plus the framework's
+# own flag/kill-switch naming convention — so the noise floor stays low.
+BACKTICK_RE = re.compile(r"`([^`]+)`")
+# A dotted lower-snake token (metric names: `app.feature.thing_measured`).
+DOTTED_SNAKE_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
+# An UPPER_SNAKE token with at least one underscore (env vars, config keys).
+UPPER_SNAKE_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")
+# Rita's flag / kill-switch convention, backticked or bare.
+FLAG_RE = re.compile(r"\b(?:FEATURE|KILL)_[A-Z0-9_]+\b")
+# Tokens ending in a source/doc file extension are filenames, not the kind of
+# runtime identifier this pass is about — drop them (the date-drift pass
+# already covers linked files).
+FILE_EXT_RE = re.compile(
+    r"\.(?:md|py|pyi|js|jsx|ts|tsx|txt|json|ya?ml|toml|ini|cfg|env|lock|sh|"
+    r"go|rs|rb|java|kt|sql|csv|html?|css)$",
+    re.IGNORECASE,
+)
+
+
+def extract_identifiers(folder: Path) -> dict[str, list[tuple[Path, int]]]:
+    """Map each documented code identifier in a feature folder's `*.md`
+    files to the (doc, line) locations that mention it."""
+    out: dict[str, list[tuple[Path, int]]] = {}
+    for doc in sorted(folder.glob("*.md")):
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            tokens: set[str] = set()
+            for tok in BACKTICK_RE.findall(line):
+                tok = tok.strip()
+                if "/" in tok or FILE_EXT_RE.search(tok):
+                    continue
+                if DOTTED_SNAKE_RE.match(tok) or UPPER_SNAKE_RE.match(tok):
+                    tokens.add(tok)
+            tokens.update(FLAG_RE.findall(line))
+            for tok in tokens:
+                out.setdefault(tok, []).append((doc, lineno))
+    return out
+
+
+def found_in_code(token: str, root: Path) -> bool:
+    """True if `token` appears literally in a file under `root` that is not
+    itself a feature doc.  Uses `git grep` where available, else walks."""
+    result = subprocess.run(
+        ["git", "grep", "-F", "-l", "-e", token],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # rc 0 = matches, 1 = no matches; both are clean answers from git.
+    if result.returncode in (0, 1) and not result.stderr.strip():
+        return any(
+            "docs/features/" not in line for line in result.stdout.splitlines()
+        )
+    # No git (or not a repo): best-effort walk, skipping .git and feature docs.
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith(".git/") or "docs/features/" in rel:
+            continue
+        try:
+            if token in path.read_text(encoding="utf-8"):
+                return True
+        except (UnicodeDecodeError, OSError):
+            continue
+    return False
+
+
+def report_refs(docs: list[Path], root: Path) -> None:
+    """Print the referential-integrity pass for each feature folder."""
+    for folder in sorted({doc.parent for doc in docs}):
+        ids = extract_identifiers(folder)
+        if not ids:
+            continue
+        rel = folder.relative_to(root)
+        missing = [(t, locs) for t, locs in sorted(ids.items()) if not found_in_code(t, root)]
+        if not missing:
+            print(f"REFS  {rel}: {len(ids)} documented identifier(s), all found in code.")
+            continue
+        print(f"REFS  {rel}: {len(missing)} of {len(ids)} documented identifier(s) not found in code")
+        for token, locs in missing:
+            where = ", ".join(f"{d.relative_to(root)}:{n}" for d, n in locs[:3])
+            print(f"      └─ `{token}`  ({where}) — verify; may be runtime-assembled")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", maxsplit=1)[0])
     parser.add_argument("--root", default=".", help="Root directory to scan (default: cwd)")
@@ -100,6 +197,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="Exit 1 if any doc is stale by more than this many days (default: never fail)",
+    )
+    parser.add_argument(
+        "--refs",
+        action="store_true",
+        help="Also run the referential-integrity pass (documented identifiers "
+        "not found in code).  Advisory — never changes the exit code.",
     )
     args = parser.parse_args(argv)
 
@@ -130,11 +233,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if not any_stale:
         print(f"OK    {len(docs)} feature doc(s) reviewed.")
-        return 0
+        exit_code = 0
+    elif args.fail_after is not None and worst_age > args.fail_after:
+        exit_code = 1
+    else:
+        exit_code = 0
 
-    if args.fail_after is not None and worst_age > args.fail_after:
-        return 1
-    return 0
+    if args.refs:
+        report_refs(docs, root)
+
+    return exit_code
 
 
 if __name__ == "__main__":

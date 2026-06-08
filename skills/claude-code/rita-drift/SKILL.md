@@ -50,44 +50,71 @@ docs against the code; they differ only in *which* docs carry the intent:
 
 State the mode you detected in the report header.
 
-### 1. Mechanical drift — the cheap pre-filter
+### 1. Mechanical pass — the cheap, deterministic pre-filter
 
-Run the bundled detector against the project root (`drift_check.py` sits
-in this skill's directory; it walks `<root>/**/docs/features/*/README.md`
-and flags docs whose linked code changed since `Last reviewed:`):
+Run the bundled detector against the project root with `--refs`
+(`drift_check.py` sits in this skill's directory):
 
 ```
-python3 <this-skill-dir>/drift_check.py --root <project-root>
+python3 <this-skill-dir>/drift_check.py --root <project-root> --refs
 ```
 
-This is deterministic and free, and it does the triage: a `STALE` line
-names the doc and the linked file that moved on. **Use that to focus the
-expensive pass below** — read those code paths first. `OK` doesn't mean
-"no drift" (the doc may link nothing, or claims may have rotted without
-the linked file changing); it means the date-vs-mtime heuristic found
-nothing. If the folder isn't in a git repo it finds no changes — note it
-and lean harder on the semantic pass.
+It does two deterministic passes that triage the expensive read below:
+
+- **Date drift** — `STALE` lines name a doc and the linked code file that
+  has a newer commit than the doc's `Last reviewed:` date. Read those
+  paths first.
+- **Referential integrity** (`--refs`) — `REFS` lines name documented
+  identifiers (backticked metric names, env vars, `FEATURE_*`/`KILL_*`
+  flags) that don't appear anywhere in the tree outside the feature docs.
+  These are **candidates, not confirmed gaps**: an identifier can be
+  assembled at runtime (a metric name built from a prefix, a flag read
+  through a constant) and so be real yet unfindable by literal search.
+  Confirm each against the code in step 2 before reporting it — see the
+  false-positive note there.
+
+`OK`/no `REFS` lines don't mean "no drift": the doc may link nothing,
+claims can rot without the linked file changing, and prose-level
+divergence is invisible to both passes. They mean the mechanical
+heuristics found nothing — the semantic pass still runs. If the folder
+isn't in a git repo, both passes degrade (no commit dates; identifier
+search falls back to a file walk) — note it and lean harder on step 2.
+
+The mechanical pass *narrows* the read; it doesn't replace it.
 
 ### 2. Doc↔code consistency and gaps — the semantic pass
 
-Read the doc set against the actual code (start where step 1 pointed) and
-find where they disagree. Gaps run **both directions**:
+Start from step 1's output — the `STALE` paths and the `REFS` candidates
+— then read the doc set against the actual code and find where they
+disagree. Gaps run **both directions**:
 
 - **Doc claims, code lacks** — a `metrics.md` metric with no emission
   site; a `test-cases.md` scenario with no implemented test; a README
   *Configuration* env var the code never reads; a `runbook.md` diagnostic
   referencing a renamed metric/log field/path; a `plan.md` *Implementation
   step* or *Definition of done* item not present in the code (pre-ship).
+  The `--refs` pass already surfaced the mechanically-findable subset of
+  these; **adjudicate each candidate** rather than passing it through.
 - **Code does, doc omits** — behaviour, a config knob, an endpoint, or an
   error path the code has that no doc mentions. Undocumented behaviour is
-  drift too.
+  drift too. (The mechanical pass cannot see this direction at all — it's
+  yours to find.)
 - **Both disagree on specifics** — doc says limit 100/min, code uses 60;
   a flag named `FEATURE_X` in the doc, `FLAG_X` in code; a threshold in
   `metrics.md` that doesn't match the alert in code.
 
 Ground every finding in `file:line` (the doc location) and a code
-`path:line` (or its absence — "grep finds no call site"). A finding you
-can't point to is a guess; drop it.
+`path:line` (or its absence). A finding you can't point to is a guess;
+drop it.
+
+**Rule out indirection before declaring a "code lacks" gap.** Literal
+search misses identifiers the code builds at runtime — a metric name
+concatenated from a prefix, an env var read via a settings object, a flag
+behind a constant or an enum. Before you report a documented identifier
+as missing, check for the *mechanism* that would produce it (a format
+string, a `getattr`, a config loader, a registry). Only report it once
+you've looked and it genuinely isn't there. A `REFS` candidate that turns
+out to be runtime-assembled is **not** a finding — say so and move on.
 
 ### 3. Open questions
 
@@ -159,6 +186,14 @@ note it needs a human answer.
 
 Close with a one-line verdict: the single most load-bearing divergence,
 and whether the doc set is safe to trust as-is.
+
+**A clean audit is the honest, good result — don't manufacture drift.**
+If the docs and the code agree, say so plainly: report zero divergences
+and a "doc set is in sync" verdict. The same way `feasibility.md` should
+have no fabricated verifications, this report should have no invented
+findings. A skill that always finds something teaches the reader to
+ignore it. Report only divergences you can point to in both the doc and
+the code (or its confirmed absence).
 
 ## Boundaries
 
