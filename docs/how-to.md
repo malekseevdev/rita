@@ -296,8 +296,10 @@ improves it in a short loop — no human in the loop yet:
     independent re-read or a second reviewer.  `rita-review` performs a
     mechanical self-review checklist (sections filled, drafting rules
     applied, feasibility honest, unknowns flagged, cross-file
-    consistency), a drift check, and a rubric scorecard, and lists
-    concrete improvements.
+    consistency) and a rubric scorecard, and lists concrete
+    improvements.  (At plan time there's no code to drift against yet —
+    checking the docs against the implementation is `rita-drift`, run
+    during implementation and maintenance; see Phase 6.)
 2.  **Improve.**  Address the improvements and any failed checklist
     items — edit the docs, don't argue with the review.
 3.  **Stop after one revision.**  Cap the loop at **two plan iterations**
@@ -444,7 +446,17 @@ rot:
 
 ### Doc drift
 
-Run the drift-detection script:
+The agent activity here is the **`rita-drift`** skill: it audits a
+feature folder against the *code* — mechanical drift, doc↔code
+inconsistencies and gaps (both "doc claims, code lacks" and "code does,
+doc omits"), unresolved `:warning: needs human input` markers, and
+stalled `Status:`.  For each divergence it proposes both fix directions
+(change the code, or change the doc) and lets you choose; it detects and
+proposes, it never mutates.  Run it during implementation (catch the
+plan and code diverging before ship) and at each maintenance review.
+
+Its mechanical first pass is the drift-detection script, which you can
+also run on its own:
 
 ```bash
 python /path/to/rita/scripts/drift_check.py --root . --fail-after 90

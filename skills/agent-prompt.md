@@ -92,8 +92,12 @@ Once approved, the path is linear:
 -   Phase 5 (*Ship*) — verify Definition of Done; delete
     `plan.md`.
 -   Phase 6 (*Maintain*) — out of session for an agent driving
-    the initial work; the user runs the drift-detection script
-    later.
+    the initial work.  Later, audit the doc set against the code:
+    run `<RITA-ROOT>/scripts/drift_check.py` as a cheap first pass,
+    then read the docs against the code for inconsistencies, gaps,
+    unresolved `:warning:` markers, and stalled `Status:`, proposing
+    a code-side and a doc-side fix for each divergence (detect and
+    propose — don't mutate).
 
 ### E. Surface clarifying questions
 
