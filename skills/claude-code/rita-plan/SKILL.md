@@ -119,9 +119,9 @@ Once approved, the path is linear:
     `plan.md`.
 -   Phase 6 (*Maintain*) is invoked separately, not as part of
     the initial shipping session.  When the user asks you to
-    check a feature later — drift detection (`scripts/drift_check.py`),
-    metric health, runbook freshness — see how-to.md Phase 6
-    for what to do.
+    check a feature later — doc drift and doc↔code gaps (the
+    `rita-delta` skill), metric health, runbook freshness — see
+    how-to.md Phase 6 for what to do.
 
 ### E. Surface clarifying questions
 
@@ -157,8 +157,7 @@ surfacing rather than just the diff:
     them gives the user a focused point to spot-check before
     the rest of the plan is written.
 -   At the end of *Plan review* (phase 3): emit `rita-review`'s
-    output — the self-review checklist (pass/fail), the drift
-    result, and the scorecard — plus what you changed in
-    response across the loop.  This is the artifact the human
-    reviewer uses to decide whether to look at the doc or send
-    it back for fixes.
+    output — the self-review checklist (pass/fail) and the
+    scorecard — plus what you changed in response across the
+    loop.  This is the artifact the human reviewer uses to decide
+    whether to look at the doc or send it back for fixes.

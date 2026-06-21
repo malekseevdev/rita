@@ -15,14 +15,19 @@ The install commands below assume you're inside the cloned
 
 ## Claude Code
 
-Two Claude Code skills live under [`claude-code/`](claude-code/):
+Three Claude Code skills live under [`claude-code/`](claude-code/):
 
 - [`rita-plan/`](claude-code/rita-plan/) — plan and ship a
   non-trivial feature through the Rita lifecycle.  Its folder bundles
   `SKILL.md` plus symlinks to Rita's `docs/` and `templates/`.
 - [`rita-review/`](claude-code/rita-review/) — grade an existing Rita
   feature folder against the shared `RUBRIC.md` and print a scorecard.
-  Useful before review, or to compare plans from different models.
+  Plan-time and doc-internal; useful before review, or to compare plans
+  from different models.
+- [`rita-delta/`](claude-code/rita-delta/) — audit a feature folder
+  against the *code*: mechanical drift (`drift_check.py`), doc↔code
+  gaps, open questions, and stalled status, with fix options to choose
+  from.  Run during implementation and at maintenance reviews.
 
 Install both with the helper script from the repo root:
 
@@ -48,7 +53,8 @@ symlinks so the copied skill folder no longer depends on the
 location of the Rita repo.
 
 Then in Claude Code, invoke `rita-plan` when starting a non-trivial
-feature task, or `rita-review` to grade a plan.
+feature task, `rita-review` to grade a plan, or `rita-delta` to audit a
+feature folder against the code.
 
 To update installed skills when Rita changes, just re-run the
 installer — it replaces any existing skills at the target.

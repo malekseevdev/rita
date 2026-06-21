@@ -1,16 +1,21 @@
 ---
 name: rita-review
-description: Review a Rita feature plan (a docs/features/<id>/ folder) — drift check (drift_check.py), an agent self-review checklist, and a rubric-scored quality scorecard with improvements. Use when asked to review, score, grade, or verify a Rita plan, to compare plans from different models, or as the automated verification step of rita-plan before human review.
+description: Review a Rita feature plan (a docs/features/<id>/ folder) — an agent self-review checklist and a rubric-scored quality scorecard with improvements. Plan-time, doc-internal — for checking shipped docs against the code, use rita-delta instead. Use when asked to review, score, grade, or verify a Rita plan, to compare plans from different models, or as the automated verification step of rita-plan before human review.
 ---
 
 # Rita: review a plan
 
-The agent verification pass over a feature doc set — everything that can
-be checked before a human looks. Three parts, in order:
+The agent verification pass over a feature *plan* — everything that can
+be checked, before a human looks, by reading the docs against themselves
+and the framework. Two parts, in order:
 
-1.  **Drift** — is any linked code newer than the doc's review date?
-2.  **Self-review** — mechanical alignment with the framework.
-3.  **Scorecard** — quality scored against the shared [`RUBRIC.md`](RUBRIC.md).
+1.  **Self-review** — mechanical alignment with the framework.
+2.  **Scorecard** — quality scored against the shared [`RUBRIC.md`](RUBRIC.md).
+
+This is plan-time and doc-internal: it does not read the docs against the
+*code*. Checking a shipped or in-flight doc set against the
+implementation — mechanical drift, doc↔code gaps, stalled status — is
+[`rita-delta`](../rita-delta/SKILL.md)'s job.
 
 `rita-plan` runs this automatically after drafting (its self-improvement
 loop); you can also invoke it standalone to verify your own plan, or to
@@ -23,27 +28,9 @@ compare plans from different models/agents (the headless
 path/to/feature`); otherwise the user names it. It's a directory with
 `README.md` and usually `feasibility.md`, `plan.md`, `test-cases.md`,
 `metrics.md`, `runbook.md`. If it has no `README.md`, it isn't a Rita
-feature folder — say so and stop. Note the enclosing project / git root
-(the directory to scan for drift).
+feature folder — say so and stop.
 
-### 1. Drift check
-
-Run the bundled drift detector against the project root (`drift_check.py`
-sits in this skill's directory; it walks
-`<root>/**/docs/features/*/README.md` and flags docs whose linked code
-changed since `Last reviewed:`):
-
-```
-python3 <this-skill-dir>/drift_check.py --root <project-root>
-```
-
-Report what it prints. A freshly-drafted plan has no drift (`OK`); on an
-older plan, `STALE` lines mean the linked code moved on and the doc needs
-re-review. If the folder isn't in a git repo, it simply finds no changes
-— note that and move on. (This is the only command you run — see
-Boundaries.)
-
-### 2. Self-review checklist
+### 1. Self-review checklist
 
 Re-read the doc set against the framework and report pass/fail per item,
 with a one-line reason for any fail:
@@ -67,7 +54,7 @@ with a one-line reason for any fail:
   feasibility, plan, metrics, runbook (metric names, env vars, the
   preferred option vs what the plan implements).
 
-### 3. Scorecard
+### 2. Scorecard
 
 Load [`RUBRIC.md`](RUBRIC.md) (alongside this file): the 0–5 scale, the 8
 dimensions, the deep checks, the total→grade mapping, and the
@@ -98,11 +85,11 @@ score, each naming the file and the specific gap.
 
 ## Boundaries
 
-- **Read-only on the plan — never execute the plan's commands.** You may
-  run the bundled `drift_check.py` (the framework's own drift tool), and
-  nothing else. Do **not** run the feasibility `Command`s or any other
-  command from the docs — judge a feasibility block from its text;
-  re-running it is the author's job, not the reviewer's.
+- **Read-only, and run nothing.** Judge the plan from its text alone. Do
+  **not** run the feasibility `Command`s or any other command from the
+  docs — re-running a feasibility block is the author's job, not the
+  reviewer's. (Checking the docs against the *code* — including running
+  `drift_check.py` — is `rita-delta`, a separate skill.)
 - **Review, don't rewrite.** This skill verifies and scores; it does not
   edit the plan. If the user wants the gaps fixed, that's `rita-plan`'s
   job — point them there.

@@ -10,6 +10,8 @@
 #   1. Fresh — doc reviewed *after* the code's last change → OK (exit 0).
 #   2. Drift — code changed *after* the review date → STALE; exit 1 under
 #              --fail-after 0, exit 0 under a generous threshold.
+#   3. Refs — with --refs, a documented identifier present in code is not
+#             flagged; one absent from code is surfaced as a candidate.
 #
 # It also sanity-checks that the committed worked example parses clean:
 # it's a Plan with no linked code, so drift_check.py reports OK on it.
@@ -136,6 +138,45 @@ run_check "$WORK_DIR" 100000
 grep -q "STALE" <<<"$CHECK_OUT" || fail "phase 2b: expected STALE to still be reported"
 set +x
 echo "PASS phase 2b: drift still reported but --fail-after threshold not exceeded (exit 0)"
+set -x
+
+# --- Phase 3: referential integrity (--refs) -------------------------
+# Document one identifier that exists in code and one that doesn't.  The
+# present one must NOT be flagged; the absent one must surface as a candidate.
+cat >> "$CODE_REL" <<'PY'
+
+WIDGET_SCALE_FACTOR = 2
+PY
+cat >> "$DOC_REL" <<'MD'
+
+## Configuration
+
+Scale is controlled by `WIDGET_SCALE_FACTOR`.
+
+## Metrics
+
+Name: `widget.doubled.count`
+MD
+git add -A   # so `git grep` sees the appended code
+
+set +e
+REFS_OUT="$(python3 "$CHECK_PY" --root "$WORK_DIR" --refs 2>&1)"
+REFS_RC=$?
+set -e
+if [[ $SHOW_OUTPUT -eq 1 ]]; then
+  echo "----- drift_check.py --root \$WORK_DIR --refs (exit $REFS_RC) -----"
+  echo "$REFS_OUT"; echo
+fi
+CHECK_OUT="$REFS_OUT"   # so fail() prints the refs output
+
+[[ $REFS_RC -eq 0 ]] || fail "phase 3: --refs is advisory and should exit 0 (no --fail-after), got $REFS_RC"
+grep -q 'widget.doubled.count' <<<"$REFS_OUT" \
+  || fail "phase 3: expected absent metric 'widget.doubled.count' as a REFS candidate"
+if grep -q '`WIDGET_SCALE_FACTOR`' <<<"$REFS_OUT"; then
+  fail "phase 3: WIDGET_SCALE_FACTOR exists in code and must not be flagged missing"
+fi
+set +x
+echo "PASS phase 3: --refs flags absent identifiers and spares present ones"
 
 echo
 echo "OK: all drift-detection assertions passed."
