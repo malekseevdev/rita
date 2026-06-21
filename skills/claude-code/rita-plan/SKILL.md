@@ -96,19 +96,21 @@ The planning loop (phases 1-3) iterates on failure:
     assumption you can't verify (infra, production, a human answer) does
     not block — flag it and write the full plan anyway.
 -   Phase 3 (*Plan review*) → fill in `plan.md`, then run the
-    **self-improvement loop**: have a **subagent** review the feature
-    folder — a fresh context, so the review reads what's on the page, not
-    your authoring rationale.  The subagent only *reviews* (it returns
-    findings, it doesn't edit); **you then apply them** — edit the docs to
-    resolve each improvement and failed check it reports.  **One** revision
-    pass (the cap is two plan iterations: the initial draft plus one fix;
-    a safety guard against churning), *then* hand to the human author/peer
-    passes.  Spawn the subagent with
-    the Agent/Task tool and have it run the `rita-review` skill on the
-    folder — as listed in your available skills, normally `/rita-review
-    <folder>`, or `/<prefix>rita-review <folder>` under the prefix this
-    skill carries; if it can't invoke the skill, it reads that skill's
-    `RUBRIC.md` and the docs and returns the same scorecard + improvements.
+    **self-improvement loop**:
+    -   **Review** — spawn a fresh-context **subagent** (Agent/Task tool)
+        to run `rita-review` on the folder, so the review reads what's on
+        the page, not your authoring rationale.  It only *reviews* —
+        returns a scorecard + improvements, edits nothing.
+    -   **Apply** — *you* edit the docs to resolve each improvement and
+        failed check.  Don't argue with the review.
+    -   **Cap** — one revision pass (two iterations total: draft + one
+        fix), then hand to the human author/peer passes.  A guard against
+        churning; genuine `:warning: needs human input` items travel on as
+        open questions rather than blocking.
+    -   **Invocation** — normally `/rita-review <folder>`, or
+        `/<prefix>rita-review <folder>` under this skill's prefix; if the
+        subagent can't invoke the skill, it reads `rita-review`'s
+        `RUBRIC.md` + docs and returns the same scorecard + improvements.
 
 Once approved, the path is linear:
 
