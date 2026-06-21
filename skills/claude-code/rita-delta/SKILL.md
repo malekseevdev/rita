@@ -1,12 +1,12 @@
 ---
-name: rita-drift
-description: Audit a Rita feature folder (docs/features/<id>/) against the code for doc rot — mechanical drift (drift_check.py), doc↔code inconsistencies and gaps, unresolved open questions, and stalled status — then propose fix options (change the code, or change the doc) for the user to choose. Read-only: detects and proposes, never mutates. Use when asked to check drift, audit, or verify a feature folder is still accurate against the implementation.
+name: rita-delta
+description: Audit a Rita feature folder (docs/features/<id>/) against the code for the doc↔code delta — mechanical drift (drift_check.py), doc↔code inconsistencies and gaps, unresolved open questions, and stalled status — then propose fix options (change the code, or change the doc) for the user to choose. Read-only: detects and proposes, never mutates. Use when asked to check drift, audit, or verify a feature folder is still accurate against the implementation.
 ---
 
-# Rita: drift — audit a feature folder against the code
+# Rita: delta — audit a feature folder against the code
 
 Where `rita-review` asks *"is this a good plan?"* (plan-time, the docs
-read against themselves), `rita-drift` asks *"is this doc set still
+read against themselves), `rita-delta` asks *"is this doc set still
 true?"* (implementation- and maintenance-time, the docs read against the
 **code**). It is the agent half of the framework's *Maintain* phase
 (`docs/how-to.md` §6 in the Rita repo), and it also runs
@@ -15,7 +15,7 @@ mid-implementation to catch the plan and the code diverging before ship.
 The two reviewer skills divide along one axis:
 
 - `rita-review` → **internal** consistency (doc↔doc) + quality. No code.
-- `rita-drift` → **external** consistency (doc↔code) + hygiene. Code is
+- `rita-delta` → **external** consistency (doc↔code) + hygiene. Code is
   the source of truth to compare against.
 
 **This skill detects and proposes. It never mutates** — not the docs, not
@@ -28,7 +28,7 @@ normal dev work.
 
 ### 0. Find the target and pick the mode
 
-A path may be given (e.g. `/rita-drift path/to/feature`); otherwise the
+A path may be given (e.g. `/rita-delta path/to/feature`); otherwise the
 user names it. It's a directory with `README.md` and usually
 `feasibility.md`, `test-cases.md`, `metrics.md`, `runbook.md`, and —
 before ship — `plan.md`. If there's no `README.md`, it isn't a Rita
@@ -145,14 +145,14 @@ Check the `Status:`/`Last reviewed:` frontmatter against reality:
 These are heuristics, not hard rules — report what you see and why it
 looks stalled, don't fail a run over a date.
 
-### 5. The drift report
+### 5. The delta report
 
 Lead with a header box, then the findings. For **every** consistency and
 status finding, give the user a choice of fix directions — that's the
 point of the skill:
 
 ```
-┌─ Rita drift report ─ <feature-dir>  [mode: pre-ship | post-ship]
+┌─ Rita delta report ─ <feature-dir>  [mode: pre-ship | post-ship]
 │ status        Implementation · last reviewed 2026-04-02 (67d ago)
 │ mechanical    2 docs STALE (drift_check.py)
 │ consistency   3 doc↔code mismatches, 1 undocumented behaviour
@@ -187,7 +187,7 @@ note it needs a human answer.
 Close with a one-line verdict: the single most load-bearing divergence,
 and whether the doc set is safe to trust as-is.
 
-**A clean audit is the honest, good result — don't manufacture drift.**
+**A clean audit is the honest, good result — don't manufacture findings.**
 If the docs and the code agree, say so plainly: report zero divergences
 and a "doc set is in sync" verdict. The same way `feasibility.md` should
 have no fabricated verifications, this report should have no invented

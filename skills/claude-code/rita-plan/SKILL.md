@@ -120,7 +120,7 @@ Once approved, the path is linear:
 -   Phase 6 (*Maintain*) is invoked separately, not as part of
     the initial shipping session.  When the user asks you to
     check a feature later — doc drift and doc↔code gaps (the
-    `rita-drift` skill), metric health, runbook freshness — see
+    `rita-delta` skill), metric health, runbook freshness — see
     how-to.md Phase 6 for what to do.
 
 ### E. Surface clarifying questions

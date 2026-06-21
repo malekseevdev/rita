@@ -298,7 +298,7 @@ improves it in a short loop — no human in the loop yet:
     applied, feasibility honest, unknowns flagged, cross-file
     consistency) and a rubric scorecard, and lists concrete
     improvements.  (At plan time there's no code to drift against yet —
-    checking the docs against the implementation is `rita-drift`, run
+    checking the docs against the implementation is `rita-delta`, run
     during implementation and maintenance; see Phase 6.)
 2.  **Improve.**  Address the improvements and any failed checklist
     items — edit the docs, don't argue with the review.
@@ -446,7 +446,7 @@ rot:
 
 ### Doc drift
 
-The agent activity here is the **`rita-drift`** skill: it audits a
+The agent activity here is the **`rita-delta`** skill: it audits a
 feature folder against the *code* — mechanical drift, doc↔code
 inconsistencies and gaps (both "doc claims, code lacks" and "code does,
 doc omits"), unresolved `:warning: needs human input` markers, and

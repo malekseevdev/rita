@@ -24,7 +24,7 @@ Three Claude Code skills live under [`claude-code/`](claude-code/):
   feature folder against the shared `RUBRIC.md` and print a scorecard.
   Plan-time and doc-internal; useful before review, or to compare plans
   from different models.
-- [`rita-drift/`](claude-code/rita-drift/) — audit a feature folder
+- [`rita-delta/`](claude-code/rita-delta/) — audit a feature folder
   against the *code*: mechanical drift (`drift_check.py`), doc↔code
   gaps, open questions, and stalled status, with fix options to choose
   from.  Run during implementation and at maintenance reviews.
@@ -53,7 +53,7 @@ symlinks so the copied skill folder no longer depends on the
 location of the Rita repo.
 
 Then in Claude Code, invoke `rita-plan` when starting a non-trivial
-feature task, `rita-review` to grade a plan, or `rita-drift` to audit a
+feature task, `rita-review` to grade a plan, or `rita-delta` to audit a
 feature folder against the code.
 
 To update installed skills when Rita changes, just re-run the

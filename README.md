@@ -125,7 +125,7 @@ on a handful of recurring pain points:
 
 Release candidate.  Framework documentation, templates, the
 drift-detection script, the Claude Code skills (`rita-plan`,
-`rita-review`, `rita-drift`), and a worked example
+`rita-review`, `rita-delta`), and a worked example
 ([`examples/search-rate-limit/`](examples/search-rate-limit/)) with
 end-to-end tests ([`tests/e2e/`](tests/e2e/)) are stable.  Additional
 scripts (feasibility verification, ship, lint) and harness integrations
@@ -140,7 +140,7 @@ beyond Claude Code are TODO.
     ```
 
 2.  Install the Claude Code skills (`rita-plan`, `rita-review`,
-    `rita-drift`):
+    `rita-delta`):
 
     ```bash
     cd rita
@@ -174,11 +174,11 @@ beyond Claude Code are TODO.
     concrete improvement suggestions.
 
     Later — during implementation, or at a maintenance review —
-    audit the doc set against the code with the **`rita-drift`**
+    audit the doc set against the code with the **`rita-delta`**
     skill:
 
     ```
-    /rita-drift docs/features/RITA-1-rate-limit-search
+    /rita-delta docs/features/RITA-1-rate-limit-search
     ```
 
     It runs the drift script as a cheap first pass, then reads the
@@ -205,7 +205,7 @@ team is ready for it.
 | [`docs/how-to.md`](docs/how-to.md) | The procedural reference the agent follows — what each file owns, the feasibility check, the review passes. |
 | [`docs/rationale.md`](docs/rationale.md) | **Explanation.**  Why Rita is shaped this way — philosophy, lessons, agent-participation patterns.  Read narratively. |
 | [`templates/`](templates/) | The six doc skeletons (README, feasibility, plan, test-cases, metrics, runbook) the `rita-plan` skill fills in. |
-| [`skills/`](skills/) | Agent-harness integrations.  Claude Code skills (`rita-plan` to plan, `rita-review` to grade a plan, `rita-drift` to audit docs against the code) + harness-agnostic agent prompt — ships.  Cursor, Continue, etc. — TODO. |
+| [`skills/`](skills/) | Agent-harness integrations.  Claude Code skills (`rita-plan` to plan, `rita-review` to grade a plan, `rita-delta` to audit docs against the code) + harness-agnostic agent prompt — ships.  Cursor, Continue, etc. — TODO. |
 | [`scripts/drift_check.py`](scripts/drift_check.py) | Drift detection.  Python 3.9+ stdlib, runs against `<root>/**/docs/features/`. |
 | [`examples/search-rate-limit/`](examples/search-rate-limit/) | Worked example — a complete feature doc set (also the eval/demo fixture). |
 | [`tests/e2e/`](tests/e2e/) | End-to-end tests: drift detection, and skill-driven plan generation + scoring.  See [Testing](#testing). |
