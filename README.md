@@ -10,15 +10,17 @@ Rita is a codified feature lifecycle workflow.  It helps teams
 preserve context, operational responsibility, and architectural
 continuity from planning through long-term maintenance.
 
-The headline above describes one of two costs Rita is built to
-defend against: **plan-time wrongness** — agent hallucinations
-that survive plan review and eat days of implementation.  The
-other is **post-merge decay** — software development doesn't end
-at merge, and AI has accelerated the rate of change along with
-the rate of architectural decay, context loss, and operational
-entropy.  Rita keeps the post-ship doc set alive long enough for
-on-call and future modifiers to use it without re-deriving
-everything from code.
+The headline above describes one of three costs Rita is built to
+defend against.  **Plan-time wrongness** — agent hallucinations that
+survive plan review and eat days of implementation.  **Plan entropy** —
+AI plans rot into patchwork: as detail piles on (clarifications, bot
+comments, one-off fixes) the original ideas and constraints get buried,
+and a local fix silently breaks a decision made elsewhere.  **Post-merge
+decay** — software development doesn't end at merge, and AI has
+accelerated the rate of architectural decay, context loss, and
+operational entropy; Rita keeps the post-ship doc set alive long enough
+for on-call and future modifiers to use it without re-deriving everything
+from code.
 
 Rita — *Release It Toolkit (AI-first)* — extends Michael Nygard's
 [*Release It!*](https://pragprog.com/titles/mnee2/release-it-second-edition/)
@@ -41,13 +43,16 @@ named decisions *before* code is written.  Features shipped with Rita are
 operable by default; on-call has what they need without re-deriving it
 from code.
 
-Three core moves:
+Four core moves:
 
 - **Verify load-bearing assumptions before writing the plan.**  Check
   whether the approach is buildable *before* drafting the rest of the
   plan, not after days of implementation reveal that it isn't.
 - **Each fact lives in one file.**  README, feasibility, plan, runbook,
   metrics, test cases — six files, no overlap, no drift.
+- **Keep the plan's core legible.**  As brief as possible; the load-bearing
+  invariants and constraints live in one short, checkable block the details
+  stay subordinate to — so a growing plan resists decaying into patchwork.
 - **Detect rot mechanically.**  Linked-code mtimes vs. doc review dates,
   re-executable feasibility commands, structural lint rules.  The discipline
   survives without anyone watching.
