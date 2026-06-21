@@ -108,11 +108,22 @@ done
 PREFIX="e2e-${RANDOM}-"
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rita-e2e-claude.XXXXXX")"
+# Hermetic isolation: measure ONLY the project-installed skill.
+# Point CLAUDE_CONFIG_DIR at a credentials-only dir so user-level skills,
+# memory, settings, plugins, and MCP can't leak into the run (an installed
+# user-level rita-plan would otherwise shadow nothing here, but its memory
+# and MCP still would). The prefixed skill installed into WORK_DIR/.claude
+# below still loads — it's a project source (cwd + --setting-sources project),
+# not under CLAUDE_CONFIG_DIR. See run_hermetic.sh for the rationale.
+HERMETIC_CFG="$(mktemp -d "${TMPDIR:-/tmp}/rita-e2e-cfg.XXXXXX")"
 cleanup() {
+  rm -rf "$HERMETIC_CFG"   # holds a copied credential — always remove
   if [[ $KEEP -eq 1 ]]; then echo "kept temp repo: $WORK_DIR" >&2
   else rm -rf "$WORK_DIR"; fi
 }
-trap cleanup EXIT
+trap cleanup EXIT   # register BEFORE copying the credential, so it's always cleaned
+[ -f "$HOME/.claude/.credentials.json" ] && cp "$HOME/.claude/.credentials.json" "$HERMETIC_CFG/"
+export CLAUDE_CONFIG_DIR="$HERMETIC_CFG"
 
 # Trace the mechanical setup (cp, git, install) so it's clear what the
 # harness does.  Suspended around the model stream further down.
