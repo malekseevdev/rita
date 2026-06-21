@@ -69,7 +69,7 @@ SKILL="${PREFIX}rita-review"
 
 # --- isolated skill env ----------------------------------------------
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rita-rank.XXXXXX")"
-# Roadmap #3 — hermetic isolation: strip user-level skills/memory/settings/
+# Hermetic isolation: strip user-level skills/memory/settings/
 # MCP/plugins via a credentials-only CLAUDE_CONFIG_DIR, so scoring measures
 # only the project-installed rita-review. (Composes cleanly when invoked by
 # test_claude.sh, which sets its own.) See run_hermetic.sh for the rationale.

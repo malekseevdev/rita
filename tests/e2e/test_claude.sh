@@ -108,7 +108,7 @@ done
 PREFIX="e2e-${RANDOM}-"
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rita-e2e-claude.XXXXXX")"
-# Roadmap #3 — hermetic isolation: measure ONLY the project-installed skill.
+# Hermetic isolation: measure ONLY the project-installed skill.
 # Point CLAUDE_CONFIG_DIR at a credentials-only dir so user-level skills,
 # memory, settings, plugins, and MCP can't leak into the run (an installed
 # user-level rita-plan would otherwise shadow nothing here, but its memory
