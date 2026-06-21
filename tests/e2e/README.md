@@ -149,6 +149,14 @@ it also skips credential loading → "Not logged in".)
 > `run_hermetic.sh` (credentials-only `CLAUDE_CONFIG_DIR`) is the next
 > step to make it fully hermetic.
 
+## `fixtures/` — eval fixtures for rita-review / rita-delta
+
+Deliberately-flawed feature folders (and code↔docs pairs) with *known*
+planted defects, for grading the review/audit skills objectively. See
+[`fixtures/README.md`](fixtures/README.md) for what each one contains.
+Plain files (no committed `.git`) — a consuming test builds git with
+pinned dates at runtime, as `test_drift.sh` does.
+
 ## The worked example (`examples/search-rate-limit/`)
 
 The reference plan for the RITA-1 feature — generated once with the
