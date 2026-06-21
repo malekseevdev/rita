@@ -1,84 +1,67 @@
 # RITA-1: operational runbook
 
-Agent-friendly diagnostic steps for the search rate limiter. Each step
-uses a concrete command with expected output. **Diagnostic steps are safe
-to run anytime; the remediation (toggle flip) requires human approval** —
-flipping `SEARCH_RATELIMIT_MODE` is a runtime change to client-facing
-behavior. Diagnose, propose, wait.
+Agent-friendly diagnostic steps. Metric names per
+[`metrics.md`](metrics.md); config keys per
+[`README.md`](README.md) Configuration. PromQL/queries below are the
+planned shape — confirm exact label names against the dashboard
+during implementation.
 
-PromQL/metric names are from [metrics.md](metrics.md). The mode-change
-command shape depends on the config-push mechanism (feasibility flag #3);
-the placeholder below assumes a config file the app re-reads.
+> **Remediation note:** the *diagnostic* steps are agent-safe. The
+> *mode flips* under "Rollout / rollback" change live behaviour and
+> require human approval — diagnose and propose, then a human flips.
 
-## Symptom: legitimate users report being throttled (unexpected 429s)
+## Symptom: legitimate users report `429` on `/search` (misfire)
 
-1.  Confirm enforcement is on and check the throttle spread:
-    `query_prometheus("sum by (decision) (rate(search_ratelimit_decision[5m]))")`
-    Expected normally: `throttle` small and concentrated. **Many distinct
-    IPs hitting `throttle`** suggests the threshold is too low or the
-    IP key is wrong (everyone sharing one bucket).
+1. Confirm enforcement is on and what limit is set:
+   `grep -E "SEARCH_RATELIMIT_(MODE|RATE|BURST)" <deployed config>`
+   Expected: `MODE=enforce`. If `off`/`shadow`, the limiter isn't the
+   cause — look elsewhere.
 
-2.  Check whether all traffic shares one key (the gateway-header failure
-    mode):
-    `query_prometheus("search_ratelimit_tracked_ips")`
-    Expected: roughly the count of active client IPs. **A value near 1**
-    means IP extraction is collapsing everyone to one IP (e.g. reading
-    `REMOTE_ADDR` = the gateway) → see feasibility flag #1. This is a
-    real-incident trigger to flip to `shadow`.
+2. Check the throttle rate:
+   `query_prometheus("sum(rate(search_ratelimit_decision{outcome='throttled'}[5m]))")`
+   Expected: near the shadow-mode prediction. A spike well above it
+   means the limit is too low for current traffic, or one shared
+   egress IP (internal caller) is being throttled as a group.
 
-3.  Search the logs for the throttle decisions to see which IPs:
-    `query_loki_logs("{app=\"search\"} |= \"ratelimit\" |= \"throttle\"")`
-    Expected: a small set of IPs. A broad spread of normal-looking IPs
-    confirms over-throttling.
+3. **Mitigation (human-approved):** flip `SEARCH_RATELIMIT_MODE` to
+   `shadow` (stops rejecting, keeps observing) or `off`. See Rollback.
+   Then re-tune `RATE`/`BURST` from a fresh shadow baseline.
 
-4.  **Remediation (needs human approval):** flip to `shadow` to stop
-    blocking while keeping data, then re-tune. See "Rollout / rollback".
+## Symptom: limiter never throttles a known abuser (bypass)
 
-## Symptom: a known abuser is NOT being throttled
+1. Check mode is `enforce` (step 1 above).
 
-1.  Confirm the mode is `enforce`, not `shadow`/`off`:
-    `cat <config-path>/search_ratelimit.conf` (or the configured source) —
-    expected `mode=enforce`. If `shadow`/`off`, that's the cause.
+2. Check the IP key actually varies per client:
+   `query_prometheus("search_ratelimit_tracked_ips")`
+   Expected: roughly the count of distinct active clients. If it's
+   ~1, every request is keying to the gateway/proxy IP → wrong
+   `SEARCH_RATELIMIT_IP_HEADER`. If it's pinned at `MAXSIZE` and
+   churning, suspect header-spoofing (many forged IPs) — confirm the
+   gateway overwrites the client-supplied header.
 
-2.  Check for fail-open events (limiter silently allowing):
-    `query_prometheus("sum by (reason) (rate(search_ratelimit_errors[5m]))")`
-    Expected: ~0. `reason=no_client_ip` means the forwarded header is
-    missing/unparseable → the abuser is being allowed via fail-open.
-    `reason=config_unreadable` means the limiter can't load its settings.
+3. Search logs for the extracted key on a sample request:
+   `query_loki_logs("{app=\"search-service\"} |= \"ratelimit\" |= \"key=\"")`
+   Expected: distinct client IPs, not a single proxy address.
 
-3.  Consider the per-worker limitation: if the abuser is spread across N
-    workers, its effective allowance is N× the per-worker rate. Check the
-    worker count against the configured `SEARCH_RATELIMIT_RATE` (feasibility
-    flag #2). The fix is lowering the per-worker rate, not a bug.
+## Symptom: `search.ratelimit.errors` is non-zero
 
-4.  Check IP rotation:
-    `query_prometheus("rate(search_ratelimit_tracked_ips[5m])")` rising
-    fast + `tracked_ips` near the cap = the abuser is rotating IPs, which
-    per-IP limiting cannot fully stop (known limitation — escalate toward
-    option C / gateway limiting).
+1. `query_prometheus("sum by (stage) (rate(search_ratelimit_errors[5m]))")`
+   Expected: empty/0. `stage=extract_ip` → IP key missing/malformed in
+   the environ; `stage=evaluate` → bucket-logic bug. Requests are
+   being served (fail-open) but the limiter is degraded.
 
-## Symptom: limiter adds latency
-
-1.  `query_prometheus("histogram_quantile(0.95, sum by (le) (rate(search_ratelimit_check_latency_bucket[5m])))")`
-    Expected: sub-millisecond. If p95 is multiple ms, suspect lock
-    contention (see plan.md Concerns → shard the store).
+2. `query_loki_logs("{app=\"search-service\"} |= \"ratelimit\" |= \"ERROR\"")`
+   Expected: empty. Any traceback localises the failing stage.
 
 ## Rollout / rollback
 
--   **To enable enforcement:** set `SEARCH_RATELIMIT_MODE=enforce` in the
-    config source; the app picks it up without a redeploy (mtime reload).
-    Verify:
-    `query_prometheus("sum(rate(search_ratelimit_decision{decision=\"throttle\"}[5m]))")`
-    — expected: > 0 only if a client is actually over the limit.
--   **To roll back (kill switch):** set `SEARCH_RATELIMIT_MODE=shadow` (keep
-    observing) or `off` (full stop). Seconds, no redeploy. **Human approval
-    required.** If the deployment turned out to support only an
-    env-var-at-start (feasibility flag #3 resolved that way), the
-    guaranteed fallback is a **rolling restart with
-    `SEARCH_RATELIMIT_MODE=off`** in the environment — still no code
-    deploy. Use SIGHUP reload instead if implemented.
-    Verify the flip took effect:
-    `query_prometheus("sum(rate(search_ratelimit_decision{decision=\"throttle\"}[2m]))")`
-    — expected: drops to 0 shortly after the flip.
--   **Confirm no data risk:** state is in-memory only; nothing to clean up
-    after a rollback.
+- **To enable (rollout):** set `SEARCH_RATELIMIT_MODE=off → shadow`,
+  observe baseline, set `RATE`/`BURST`, then `shadow → enforce`.
+- **To roll back (misfire):** set `SEARCH_RATELIMIT_MODE=enforce →
+  off` (or `shadow`). Takes effect in seconds with no redeploy *if* the
+  stack reloads the mode live (unverified — see feasibility.md; otherwise
+  it's redeploy-fast). No data to clean up — in-memory buckets reset.
+- **Verify:**
+  `query_prometheus("search_ratelimit_mode")` reflects the new mode,
+  and `rate(search_ratelimit_decision{outcome='throttled'}[5m])` drops
+  to 0 after a flip to `off`/`shadow`.

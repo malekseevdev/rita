@@ -1,7 +1,7 @@
 # RITA-1: Rate-limit the public search endpoint
 
 > Status: Plan
-> Last reviewed: 2026-05-31
+> Last reviewed: 2026-06-21
 > Ticket: RITA-1
 
 | Document                                 | Purpose                            |
@@ -13,152 +13,118 @@
 | [metrics.md](metrics.md)                 | Metrics catalog and baseline       |
 | [runbook.md](runbook.md)                 | Agent-friendly operational runbook |
 
-> **Planning assumptions (autonomous run — confirm before build).** The
-> repo currently contains only `TICKET.md`; there is no search-service
-> code yet. This plan assumes the WSGI app lives (or will live) under
-> `search-service/` and that the rate limiter is added there as in-process
-> WSGI middleware. File:line references are deferred to implementation.
-> The load-bearing open questions are flagged in
-> [feasibility.md](feasibility.md) — chiefly **which header the gateway
-> uses to forward the client IP** and **how many worker processes/hosts
-> serve the endpoint**. Neither blocks writing this plan, but both must be
-> answered before the threshold can be set correctly.
-
 ## Overview
 
-This feature adds **per-client (per-IP) rate limiting** to the public,
-unauthenticated `GET /search` endpoint. Each client IP gets a token
-bucket; requests that arrive faster than the configured rate receive an
-HTTP `429 Too Many Requests` response with a `Retry-After` header, while
-clients within their budget are unaffected. The limiter is implemented as
-self-contained WSGI middleware using **only the Python standard library**
-— no Redis, no `flask-limiter`, no new request-path infrastructure. A
-single runtime setting (`SEARCH_RATELIMIT_MODE`) selects `off`, `shadow`
-(count-and-log only, never block), or `enforce`, and can be changed
-without a redeploy so operators can disable enforcement in seconds if it
-misfires.
+Adds per-client rate limiting to the public, unauthenticated
+`GET /search` endpoint. Each client — keyed by IP — is allowed a
+bounded request rate; requests above that rate are rejected with
+`429 Too Many Requests` and a `Retry-After` header instead of being
+served. The limiter is an in-process WSGI middleware built entirely
+on the Python standard library, with no new infrastructure on the
+request path. Enforcement runs in one of three modes — `off`,
+`shadow` (count-only, never reject), or `enforce` — controlled by a
+single setting that doubles as the emergency off-switch.
 
 ## Why
 
-`GET /search` is public and unauthenticated. A single scraper has already
-pushed enough query volume to degrade search latency for *everyone*, and
-today the only mitigation is to ship a deploy — minutes-to-hours of
-exposure while a human writes, reviews, and releases a change. We need to
-(a) automatically throttle a small number of abusive clients before they
-degrade shared latency, (b) leave normal users untouched, and (c) hold a
-fast off-switch for when the limiter itself misbehaves. The constraint is
-that the fix must be self-contained in the search service: standard
-library only, no new infrastructure on the request path.
+`GET /search` is public and unauthenticated, so a single abusive
+client (a scraper) can push enough query volume to degrade search
+latency for *every* user. Today the only mitigation is to ship a
+deploy — minutes-to-hours of exposure during an incident. This
+feature caps any one client's share of capacity so an abuser is
+throttled while normal users are unaffected, and it gives on-call a
+runtime switch to disable enforcement in seconds if it misfires
+(contingent on a live config-reload mechanism — see feasibility.md).
 
 ## Invariants & constraints
 
-The non-negotiables — the plan's constitution. Everything below is
-subordinate; on conflict a constraint wins.
+The non-negotiables this feature must hold — the plan's constitution.
+Everything below is subordinate; on conflict, a constraint wins.
 
 | Constraint | Why it's load-bearing | How it's checked |
 | ---------- | --------------------- | ---------------- |
-| **Standard library only** — no new runtime deps, no new request-path infra | Ticket's hard scope boundary; keeps the limiter self-contained and installable with zero installs | No imports outside the stdlib (grep/lint); DoD item; `pip`-free deploy |
-| **Enforcement disables without a redeploy** | The ticket's core ask — today's only mitigation is a deploy | `SEARCH_RATELIMIT_MODE` re-read at runtime; test flips `off` without restart |
-| **Normal users unaffected** — only over-budget clients see `429` | A limiter that throttles legitimate traffic is worse than none | `test-cases.md` within-budget scenarios assert no `429` |
+| **Standard library only** — no new third-party runtime deps, no new request-path infra | Keeps the limiter self-contained and installable anywhere; ticket-mandated | `grep` import list in CI; DoD item; no new entries in `requirements.txt` |
+| **Normal clients are never throttled** — limits sit above legitimate per-IP traffic | A limiter that throttles real users is worse than the abuse it prevents | `shadow`-mode baseline shows 0 legitimate clients would be rejected (metrics.md); test case for under-limit traffic |
+| **A misfire is reversible in seconds without a deploy** | The whole point vs. today's deploy-only mitigation | Setting flip to `off`/`shadow`; runbook one-shot; DoD item. *Rests on a live mode-reload mechanism — flagged unverified in feasibility.md; if none exists the claim downgrades to "redeploy-fast".* |
+| **The limiter never fails the request path** — limiter bugs/exhaustion must not 500 the endpoint; fail *open* | Search availability outranks rate-limit accuracy | Test case: limiter exception → request still served; metric on limiter-internal errors |
+| **Per-IP state is memory-bounded** — the IP→bucket map cannot grow without limit | IP is attacker-controlled; an unbounded map is a memory-exhaustion DoS vector | Eviction of idle entries + cap; test case; `maxsize` config; metric on tracked-IP count |
 
 ## Options considered
 
 | Option        | Pros                | Cons                  |
 | ------------- | ------------------- | --------------------- |
-| **(preferred) A — In-process per-IP token bucket (WSGI middleware, stdlib)** | Stdlib-only, zero new infra/deps; O(1) state per IP; allows normal bursts; ships entirely inside the search service; instant `mode` toggle. | Buckets are **per worker process** — no shared state, so the effective limit is `per_worker_rate × workers × hosts` (must tune for this). Per-IP keying is defeated by IP rotation. |
-| B — In-process sliding-window counter (stdlib) | More accurate at window boundaries than a fixed window; stdlib-only. | Stores per-IP timestamp lists → more memory and GC churn than a bucket; same per-process limitation as A; more code for marginal accuracy gain at our scale. |
-| C — Push rate limiting to the gateway/proxy | Naturally shared across all workers/hosts (one correct limit); keeps app stateless; battle-tested limiter implementations; the gateway already terminates the client connection and knows the real IP. | Out of scope for this ticket (explicitly "self-contained in the search service, no new infra"); depends on gateway capability we may not have and a cross-team change; longer lead time. **Named honestly as the architecturally "right" long-term home — see Preferred.** |
-| D — Manual IP blocklist (automate today's "ship a deploy") | Simple; precise for a known bad actor. | Reactive, not preventive; needs a human to identify and add each IP; doesn't protect against a *new* scraper degrading latency before anyone notices. |
-| Do nothing | No cost. | Problem remains: one scraper can degrade latency for everyone; mitigation stays a slow deploy. |
+| **(preferred) A — In-process token-bucket middleware, per IP, stdlib only** | Meets the stdlib/no-infra constraint; smooth limiting (allows short bursts, caps sustained rate); tiny memory per IP; trivially reversible via a mode setting | Per-*process* state — effective limit multiplies by worker count (see Impact); no cross-host coordination (acceptable: fleet is small/stable per ticket) |
+| B — In-process fixed-window counter, per IP | Simplest possible logic | Boundary bursts: a client can send 2× the limit across a window edge; coarser fairness than a bucket for the same memory |
+| C — Sliding-window log, per IP | Most accurate rate accounting | Stores a timestamp per recent request → far higher memory under attack (the exact condition we must survive); over-engineered for the goal |
+| D — External limiter (Redis token bucket / nginx `limit_req` at the gateway) | Shared state across all workers/hosts; battle-tested | **Violates the standard-library / no-new-infra constraint**; adds a request-path dependency and an ops surface; rejected outright |
+| Do nothing    | No cost             | Abuse continues to degrade latency for everyone; mitigation stays deploy-only |
 
-**Preferred: A — in-process per-IP token bucket as stdlib WSGI
-middleware.** It is the only option that satisfies the ticket's hard
-constraints (standard library only, no new request-path infrastructure,
-self-contained in the search service) while actively *preventing* latency
-degradation rather than reacting to it (vs. D). The token-bucket
-algorithm is chosen over a sliding window (B) because it allows the short
-bursts normal clients produce while still capping sustained abuse, with
-O(1) state per IP and no timestamp lists.
+**Preferred: A — in-process per-IP token bucket as WSGI middleware.**
+A token bucket is the closest well-understood precedent for "cap
+sustained rate but tolerate short bursts," and its per-IP state is
+just two numbers (`tokens`, `last_refill`) — orders of magnitude less
+memory than a sliding-window log (C) under the attack we must
+survive. It beats a fixed-window counter (B) on boundary fairness for
+the same footprint. The standard-library constraint rules out the
+otherwise-attractive shared-state option (D); the ticket's "fleet is
+small and stable" note is what makes per-process state acceptable —
+see the worker-multiplier item in Impact, which is the main thing a
+reviewer must sign off on.
 
-The honest caveat, stated up front: gateway-level limiting (C) is the
-architecturally correct long-term home — it would give a single
-fleet-wide limit instead of a per-worker one and keep the app stateless.
-We are deliberately *not* doing C now because the ticket scopes the work
-to the service and forbids new infra, and because C requires a cross-team
-gateway change. **Recommendation:** ship A as the immediate,
-self-contained mitigation, and file a follow-up to evaluate moving
-enforcement to the gateway (C) once the fleet grows beyond where
-per-worker limits are easy to reason about. The per-worker limitation of A
-is acceptable *today* specifically because the ticket states the fleet is
-"small and stable."
+The `429` response shape follows RFC 6585 / RFC 9110 (`429 Too Many
+Requests` + `Retry-After`), the standard precedent for this status.
 
 ## Impact
 
-On-call and future modifiers read this section to understand the blast
-radius without re-deriving it from code.
-
 **Cross-component (always check):**
 
-- **Audience** — every unauthenticated caller of `GET /search`. The
-  intent is that *normal* users see no change and only sustained
-  high-volume clients (scrapers) see `429`s. A mis-tuned threshold or a
-  bad IP extraction (see below) is the main way legitimate users could be
-  affected — e.g. many users behind one corporate NAT/proxy sharing one
-  IP would share one bucket. :warning: **needs human input:** is shared-IP
-  traffic (corporate NAT, mobile carrier CGNAT) a real segment for this
-  endpoint? It affects how generous the per-IP limit must be.
-- **Coordinated changes** — depends on the **gateway** forwarding the
-  client IP in a known, trustworthy header (e.g. an `X-Forwarded-For` the
-  gateway sets, not a blindly-trusted client-supplied value). No code
-  change is required *in* the gateway for option A, but its header
-  behavior is load-bearing and must be confirmed (see
-  [feasibility.md](feasibility.md)). Can be deployed independently of
-  other services once that header contract is confirmed.
-- **Client compatibility** — no client software change required. Clients
-  that don't handle `429`/`Retry-After` will simply see a failed request
-  during throttling; well-behaved clients back off. Older clients are
-  safe (the endpoint contract is unchanged for under-limit traffic).
-- **Backwards compatibility** — additive. Under-limit responses are
-  unchanged. The only new observable behavior is the `429` response for
-  over-limit clients. No API schema, config format, or on-disk format
-  changes.
+- **Audience** — every unauthenticated caller of `GET /search`.
+  Legitimate users must be unaffected (see Invariants); only clients
+  exceeding the per-IP rate see `429`. :warning: **needs human
+  input:** confirm no internal service or batch job calls `/search`
+  through a single shared egress IP — such a caller would look like
+  one heavy "client" and could be throttled as a group.
+- **Coordinated changes** — none required in other services. The
+  gateway already forwards client IP (ticket); we only *read* it. No
+  partner change set is pulled into this plan.
+- **Client compatibility** — clients that stay under the limit see no
+  change. Clients over the limit must tolerate `429`/`Retry-After`;
+  this is standard HTTP, but a naive scraper may retry-storm. No
+  client *version* bump is needed.
+- **Backwards compatibility** — `GET /search` request/response shape
+  is unchanged for under-limit traffic; `429` is a new possible
+  status code. No config or on-disk format changes.
 
 **Project-specific:**
 
-- **Edge / gateway** — this introduces rate-limiting behavior at the
-  *application* layer, behind the gateway. **Reconciliation rule for when
-  option C ships:** when a gateway limiter is enabled, set the app-layer
-  `SEARCH_RATELIMIT_MODE=shadow` so the gateway *owns* enforcement
-  (fleet-wide, correct limit) and the app only observes — never two layers
-  both returning `429` for the same client. The C-rollout owner is
-  responsible for that cutover (flip app to `shadow` in the same change
-  that enables the gateway limiter), and the app-layer limiter can later be
-  removed once C is stable. Until then the app layer enforces.
-- **Replication / persistence** — none. Limiter state is in-memory and
-  per-process; nothing is written to a database or fans out to replicas.
-- **Admin UI** — none. Control is via the `SEARCH_RATELIMIT_MODE` setting
-  and the metrics dashboard, not a UI.
-- **Analytics / data warehouse** — none directly; the new metrics (see
-  [metrics.md](metrics.md)) may be scraped into the existing metrics
-  pipeline.
-- **External systems** — none on the request path (that is the point of
-  the stdlib-only constraint).
+- **Edge / gateway** — the gateway forwards the client IP that keys
+  the limiter. This feature does **not** change gateway config; the
+  gateway is a hard scope boundary (see feasibility for the
+  IP-source unknown).
+- **Replication / persistence** — none. The limiter holds only
+  in-memory, per-process state; nothing is written to a datastore.
+- **Worker multiplier** — limits are enforced per WSGI worker
+  process. With *N* workers on a host, a client's effective ceiling
+  is roughly *N* × the per-process limit (load balancing across
+  workers is not sticky by IP). Thresholds in `metrics.md` and the
+  configured limit must account for *N*. :warning: **needs human
+  input:** confirm the deployed worker/process count per host (see
+  feasibility).
+- **Admin UI / Analytics / External systems** — none.
 
 <!-- Sections below are filled in during implementation: -->
 
 ## How it works
 
-_(Filled in during implementation — Phase 4. Will document the WSGI
-middleware entry point, the token-bucket data structure, IP extraction,
-and the mode-toggle reload, with file:line references.)_
+_(Filled in during implementation — will carry the end-to-end
+request flow with file:line entry points once code exists.)_
 
 ## System interactions
 
-_(Filled in during implementation — Phase 4.)_
+_(Filled in during implementation.)_
 
 ## Configuration
 
-_(Filled in during implementation — Phase 4. Will document
-`SEARCH_RATELIMIT_MODE`, the per-IP rate/burst settings, the
-config-reload mechanism, and defaults. Draft intent is in
-[plan.md](plan.md) under Deployment plan.)_
+_(Filled in during implementation. Planned settings — name, mode,
+limit, burst, eviction — are drafted under_ [plan.md](plan.md)
+_"Deployment plan" until ship, then move here.)_

@@ -1,85 +1,86 @@
 # RITA-1: test cases
 
-BDD-style Given/When/Then, from the client's observable perspective.
-Test paths are the *planned* locations (greenfield service); they are
-written alongside the implementation in Phase 4.
+BDD-style Given/When/Then, observable behaviour from the client's and
+operator's perspective. Test names are the planned implementation
+targets (filled in / confirmed during implementation).
 
 ---
 
-**Given** `SEARCH_RATELIMIT_MODE=enforce` and a single client IP,
-- **when** it sends requests *within* its rate/burst,
-  **then** every response is `200` and unchanged from today.
-- **when** it sends a burst that *empties* its bucket,
-  **then** the over-limit requests get `429 Too Many Requests` with a
-  `Retry-After` header, and a `decision=throttle` metric increments.
-- **when** it then waits long enough for the bucket to refill,
-  **then** subsequent requests get `200` again (recovery).
+**Given** `SEARCH_RATELIMIT_MODE=enforce` and a client IP that has not
+exceeded its rate,
+- **when** the client sends `GET /search` within its allowance,
+  **then** the response is the normal search result (not `429`);
+- **when** the client exceeds its rate, **then** the response is
+  `429 Too Many Requests` with a `Retry-After` header;
+- **when** the client waits and tokens refill, **then** a subsequent
+  request succeeds again.
 
-*Test:* `search-service/tests/test_ratelimit_enforce.py`
-
-**Given** two distinct client IPs in `enforce` mode, one abusive and one
-normal,
-**when** the abusive IP is being throttled,
-**then** the normal IP still receives `200` (per-IP isolation — abuse of
-one client never affects another).
-
-*Test:* `search-service/tests/test_ratelimit_enforce.py::test_ip_isolation`
+*Test:* `test_ratelimit.py::test_enforce_allows_under_limit`,
+`::test_enforce_throttles_over_limit`,
+`::test_throttled_sets_retry_after`, `::test_refill_allows_again`
 
 **Given** `SEARCH_RATELIMIT_MODE=shadow`,
-**when** a client exceeds its rate/burst,
-**then** it still receives `200` (never blocked), but a
-`decision=shadow_throttle` metric increments and a throttle log line is
-emitted — so thresholds can be tuned against real traffic before
-enforcing.
+- **when** a client exceeds its rate, **then** the request is still
+  served normally (no `429`);
+- **and** the would-throttle decision is recorded in
+  `search.ratelimit.decision` (so a baseline can be measured without
+  affecting users).
 
-*Test:* `search-service/tests/test_ratelimit_shadow.py`
+*Test:* `test_ratelimit.py::test_shadow_never_rejects`,
+`::test_shadow_emits_would_throttle`
 
 **Given** `SEARCH_RATELIMIT_MODE=off`,
-**when** a client sends arbitrarily high volume,
-**then** it is never throttled and no `decision` metric is emitted other
-than (optionally) `allow` — the limiter is fully inert.
+**when** any volume of requests arrives,
+**then** no request is throttled and the limiter does no per-IP
+bookkeeping.
 
-*Test:* `search-service/tests/test_ratelimit_off.py`
+*Test:* `test_ratelimit.py::test_off_is_noop`
 
-**Given** a running process in `shadow`/`off`,
-**when** an operator changes the mode in the config source to `enforce`
-(without a redeploy or restart),
-**then** within the reload interval a new over-limit request gets `429`
-— proving the no-redeploy kill switch works in both directions.
+**Given** the limiter raises an internal exception while evaluating a
+request (fault injected),
+**when** `GET /search` is called in `enforce` mode,
+**then** the request is served normally (fail open, no `500`) and
+`search.ratelimit.errors` is incremented.
 
-*Test:* `search-service/tests/test_ratelimit_reload.py`
+*Test:* `test_ratelimit.py::test_fails_open_on_error`
 
-**Given** a request whose forwarded-IP header is missing or unparseable
-(error precondition),
-**when** it reaches the limiter in `enforce` mode,
-**then** the request is **allowed** (fail-open) and a
-`errors,reason=no_client_ip` metric increments — a limiter that can't
-identify the client must never block search.
+**Given** a flood of requests from many distinct IPs exceeding
+`SEARCH_RATELIMIT_MAXSIZE`,
+**when** they are processed,
+**then** the tracked-IP map never exceeds `MAXSIZE` (idle entries are
+evicted) and memory stays bounded.
 
-*Test:* `search-service/tests/test_ratelimit_failopen.py`
+*Test:* `test_ratelimit.py::test_map_bounded`
 
-**Given** a config source that is missing or malformed (error
-precondition),
-**when** the loader runs,
-**then** the mode falls back to `shadow` (safe default: observe, never
-block) and an `errors,reason=config_unreadable` metric increments.
+**Given** `enforce` mode is active and on-call flips
+`SEARCH_RATELIMIT_MODE` to `off`,
+**when** a previously-throttled client retries,
+**then** it is served without `429` **without a process restart /
+redeploy**.
 
-*Test:* `search-service/tests/test_ratelimit_config.py`
+*Test:* `test_ratelimit.py::test_mode_flip_takes_effect_live` (or
+*manual* — verified by the runbook one-shot if live re-read is
+config-managed rather than unit-testable)
 
-**Given** more distinct client IPs arrive than
-`SEARCH_RATELIMIT_MAX_TRACKED_IPS`,
-**when** new IPs push the store past its cap,
-**then** the least-recently-used buckets are evicted (memory stays
-bounded) and an evicted IP that returns is treated as a fresh client.
+**Given** a single *legitimate* high-volume source behind one shared
+egress IP (an internal service or batch job calling `/search`),
+**when** its aggregate rate exceeds the per-IP limit in `enforce`
+mode,
+**then** it must NOT be throttled as if it were one abusive client
+(the "normal clients are never throttled" invariant). The intended
+mechanism — an allowlist of trusted IPs, or a higher per-key limit
+for them — is :warning: **needs human input** (depends on confirming
+such callers exist; see README Impact). Until decided, this scenario
+is the canary the shadow-mode baseline must surface.
 
-*Test:* `search-service/tests/test_bucket_store.py::test_lru_eviction`
+*Test:* `test_ratelimit.py::test_allowlisted_ip_not_throttled`
+(pending the allowlist decision; *manual* via shadow baseline review
+until then)
 
-**Given** a spoofed client-supplied `X-Forwarded-For` (security
-precondition),
-**when** the gateway is configured to overwrite it with the real client
-IP,
-**then** the limiter keys on the gateway-set value, not the spoofed one.
+**Given** two requests from the same client arriving concurrently on
+different worker threads,
+**when** both consume from the same bucket,
+**then** token accounting stays consistent (no lost decrement / double
+spend).
 
-*Test:* manual — verified against staging behind the real gateway once
-feasibility flag #1 (header semantics) is confirmed; cannot be fully
-proven in a unit test because it depends on gateway config, not our code.
+*Test:* `test_ratelimit.py::test_concurrent_same_key_consistent`
