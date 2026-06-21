@@ -71,10 +71,16 @@ def extract_links(doc: Path) -> list[Path]:
     return out
 
 
-def last_modified(path: Path) -> dt.date | None:
-    """Return the date of the most recent commit touching `path`."""
+def last_modified(path: Path, root: Path) -> dt.date | None:
+    """Return the date of the most recent commit touching `path`.
+
+    Runs `git log` with cwd=root so the lookup works regardless of the
+    process's own working directory — otherwise date-drift silently finds
+    nothing whenever the script is invoked from outside the target repo
+    (the same cwd discipline `found_in_code` already uses)."""
     result = subprocess.run(
         ["git", "log", "-1", "--format=%cs", "--", str(path)],
+        cwd=root,
         capture_output=True,
         text=True,
         check=False,
@@ -88,7 +94,7 @@ def last_modified(path: Path) -> dt.date | None:
         return None
 
 
-def check_doc(doc: Path) -> tuple[dt.date | None, list[tuple[Path, dt.date]]]:
+def check_doc(doc: Path, root: Path) -> tuple[dt.date | None, list[tuple[Path, dt.date]]]:
     """Return (review_date, stale_links).  stale_links is a list of
     (linked_file, file_mtime) pairs where file_mtime > review_date."""
     review = parse_review_date(doc)
@@ -96,7 +102,7 @@ def check_doc(doc: Path) -> tuple[dt.date | None, list[tuple[Path, dt.date]]]:
         return None, []
     stale: list[tuple[Path, dt.date]] = []
     for link in extract_links(doc):
-        mtime = last_modified(link)
+        mtime = last_modified(link, root)
         if mtime and mtime > review:
             stale.append((link, mtime))
     return review, stale
@@ -217,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     worst_age = 0
 
     for doc in docs:
-        review, stale = check_doc(doc)
+        review, stale = check_doc(doc, root)
         rel = doc.relative_to(root)
         if review is None:
             print(f"WARN  {rel}: no `Last reviewed:` line")

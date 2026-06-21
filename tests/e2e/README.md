@@ -116,6 +116,39 @@ The score is informational (a comparison signal), not a pass/fail gate.
 The interactive equivalent is just invoking the **`rita-review`** skill in
 a session — same skill, same rubric.
 
+## `run_hermetic.sh` — hermetic isolation primitive
+
+A wrapper that runs `claude -p` with the host's user-level state stripped:
+no installed skills (`~/.claude/skills/`), no auto-memory, no
+`settings.json`, no plugins, no configured MCP — **only** auth. It points
+`CLAUDE_CONFIG_DIR` at a fresh temp dir holding just a copy of
+`.credentials.json`, and runs from a neutral cwd so no project-level
+`.claude/` leaks either.
+
+```bash
+tests/e2e/run_hermetic.sh --model sonnet "your prompt here"
+tests/e2e/run_hermetic.sh --cwd /path/to/workdir --output-format json "…"
+```
+
+Why it exists: a normal subagent — and even `claude -p` with the default
+config dir — *inherits* the user's installed skills. So a "no-skill"
+baseline can silently auto-load an installed Rita skill and behave as if
+it had it, which quietly invalidates any A/B comparison. `run_hermetic.sh`
+is the clean-baseline runner for evals, and the building block for making
+the smoke test below fully hermetic.
+
+Known residual: it isolates *discovery/auto-load*, not the filesystem — a
+run can still read a checked-out repo if it goes looking. Full isolation
+needs a sandbox/container without repo access. (Do **not** add `--bare`:
+it also skips credential loading → "Not logged in".)
+
+> Note: `test_claude.sh` currently isolates *settings* only
+> (`--setting-sources project` + a prefixed project-scoped install), so a
+> user-level skill can't shadow the one under test — but it still inherits
+> user memory/MCP from the default config dir. Routing it through
+> `run_hermetic.sh` (credentials-only `CLAUDE_CONFIG_DIR`) is the next
+> step to make it fully hermetic.
+
 ## The worked example (`examples/search-rate-limit/`)
 
 The reference plan for the RITA-1 feature — generated once with the

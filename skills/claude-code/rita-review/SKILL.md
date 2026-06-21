@@ -53,6 +53,13 @@ with a one-line reason for any fail:
 - [ ] **Cross-file consistency** — no contradictions between README,
   feasibility, plan, metrics, runbook (metric names, env vars, the
   preferred option vs what the plan implements).
+- [ ] **Internal-claim consistency** — no claim stated *unconditionally*
+  in one place that another file makes *contingent*, and no behaviour
+  described two ways. The common tells: a capability asserted flatly in
+  the Overview ("disabled in seconds, no redeploy") that feasibility/plan
+  flag as depending on an unverified assumption; a value or behaviour
+  (a threshold, an off-state, a default) described one way in one doc and
+  differently in another. Name the two spots that disagree.
 
 ### 2. Scorecard
 
