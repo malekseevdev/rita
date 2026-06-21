@@ -116,14 +116,14 @@ WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rita-e2e-claude.XXXXXX")"
 # below still loads — it's a project source (cwd + --setting-sources project),
 # not under CLAUDE_CONFIG_DIR. See run_hermetic.sh for the rationale.
 HERMETIC_CFG="$(mktemp -d "${TMPDIR:-/tmp}/rita-e2e-cfg.XXXXXX")"
-[ -f "$HOME/.claude/.credentials.json" ] && cp "$HOME/.claude/.credentials.json" "$HERMETIC_CFG/"
-export CLAUDE_CONFIG_DIR="$HERMETIC_CFG"
 cleanup() {
   rm -rf "$HERMETIC_CFG"   # holds a copied credential — always remove
   if [[ $KEEP -eq 1 ]]; then echo "kept temp repo: $WORK_DIR" >&2
   else rm -rf "$WORK_DIR"; fi
 }
-trap cleanup EXIT
+trap cleanup EXIT   # register BEFORE copying the credential, so it's always cleaned
+[ -f "$HOME/.claude/.credentials.json" ] && cp "$HOME/.claude/.credentials.json" "$HERMETIC_CFG/"
+export CLAUDE_CONFIG_DIR="$HERMETIC_CFG"
 
 # Trace the mechanical setup (cp, git, install) so it's clear what the
 # harness does.  Suspended around the model stream further down.

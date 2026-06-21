@@ -74,14 +74,14 @@ WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rita-rank.XXXXXX")"
 # only the project-installed rita-review. (Composes cleanly when invoked by
 # test_claude.sh, which sets its own.) See run_hermetic.sh for the rationale.
 HERMETIC_CFG="$(mktemp -d "${TMPDIR:-/tmp}/rita-rank-cfg.XXXXXX")"
-[ -f "$HOME/.claude/.credentials.json" ] && cp "$HOME/.claude/.credentials.json" "$HERMETIC_CFG/"
-export CLAUDE_CONFIG_DIR="$HERMETIC_CFG"
 cleanup() {
   rm -rf "$HERMETIC_CFG"   # holds a copied credential — always remove
   if [[ $KEEP -eq 1 ]]; then echo "kept temp skill-env: $WORK_DIR" >&2
   else rm -rf "$WORK_DIR"; fi
 }
-trap cleanup EXIT
+trap cleanup EXIT   # register BEFORE copying the credential, so it's always cleaned
+[ -f "$HOME/.claude/.credentials.json" ] && cp "$HOME/.claude/.credentials.json" "$HERMETIC_CFG/"
+export CLAUDE_CONFIG_DIR="$HERMETIC_CFG"
 
 bash "$INSTALLER" --prefix "$PREFIX" "$WORK_DIR" >/dev/null
 
