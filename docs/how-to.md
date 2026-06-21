@@ -12,7 +12,7 @@ Don't duplicate prose across docs.
 
 | Information | Owns it |
 |---|---|
-| What the change is, options considered, preferred solution + why, impact (audience + affected systems), how it works, system interactions, configuration | `README.md` |
+| Invariants & constraints, what the change is, options considered, preferred solution + why, impact (audience + affected systems), how it works, system interactions, configuration | `README.md` |
 | Load-bearing assumptions and their verifications | `feasibility.md` |
 | Implementation steps, dependencies, deployment, rollback, DoD | `plan.md` (deleted at ship time) |
 | Symptoms → diagnostics → fixes; operator one-shots | `runbook.md` |
@@ -43,6 +43,17 @@ check against your draft — the failure mode is rework caught at
 review instead of caught at writing.  Full reasoning for each
 rule lives in [`rationale.md#drafting-pitfalls`](rationale.md#drafting-pitfalls).
 
+-   **As brief as possible, never briefer.**  A plan rots when detail
+    swamps the load-bearing decisions.  Keep only what's load-bearing in
+    the doc; push the rest out of band — to code, tests, or the ticket —
+    and reference it.  Detail that doesn't change a decision doesn't
+    belong in the plan.
+-   **Keep details subordinate to the constraints.**  The *Invariants &
+    constraints* block is the plan's constitution: on conflict a
+    constraint wins, and a detail that contradicts one is a bug in the
+    detail, not a new fact.  State each constraint as something
+    *checkable* (a test, a DoD item, a `drift_check --refs` grep) and
+    reference it elsewhere rather than restating it.
 -   **Ground every API/schema proposal in the closest existing
     precedent.**  Name the precedent in the plan so the reviewer
     has something concrete to compare against.  Divergence is
@@ -85,6 +96,13 @@ Read the ticket.  Then fill in:
 -   `README.md` *Overview* — one paragraph; what the feature does.
 -   `README.md` *Why* — the problem this solves; distil it, don't
     paste the ticket.
+-   `README.md` *Invariants & constraints* — the non-negotiables the
+    feature must hold (the plan's constitution): hard limits, contracts,
+    must-not-breaks.  Keep it short; everything else is subordinate.
+    Make each *checkable* and name how (a test, a DoD item, a grep) — a
+    prose constraint nobody can check is the one a later edit quietly
+    breaks.  Changing a constraint later is a deliberate act that
+    re-opens review, not a side effect of a fix.
 -   `README.md` *Options considered* — the table of alternatives
     and trade-offs, with *Preferred* named.  Include options the
     ticket didn't mention if you see them — this is the place

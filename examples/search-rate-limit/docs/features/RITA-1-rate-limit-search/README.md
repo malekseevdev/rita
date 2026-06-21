@@ -50,6 +50,17 @@ fast off-switch for when the limiter itself misbehaves. The constraint is
 that the fix must be self-contained in the search service: standard
 library only, no new infrastructure on the request path.
 
+## Invariants & constraints
+
+The non-negotiables — the plan's constitution. Everything below is
+subordinate; on conflict a constraint wins.
+
+| Constraint | Why it's load-bearing | How it's checked |
+| ---------- | --------------------- | ---------------- |
+| **Standard library only** — no new runtime deps, no new request-path infra | Ticket's hard scope boundary; keeps the limiter self-contained and installable with zero installs | No imports outside the stdlib (grep/lint); DoD item; `pip`-free deploy |
+| **Enforcement disables without a redeploy** | The ticket's core ask — today's only mitigation is a deploy | `SEARCH_RATELIMIT_MODE` re-read at runtime; test flips `off` without restart |
+| **Normal users unaffected** — only over-budget clients see `429` | A limiter that throttles legitimate traffic is worse than none | `test-cases.md` within-budget scenarios assert no `429` |
+
 ## Options considered
 
 | Option        | Pros                | Cons                  |

@@ -60,6 +60,13 @@ with a one-line reason for any fail:
   flag as depending on an unverified assumption; a value or behaviour
   (a threshold, an off-state, a default) described one way in one doc and
   differently in another. Name the two spots that disagree.
+- [ ] **Constraint coherence** — if the feature has real non-negotiables,
+  *Invariants & constraints* is declared and short; no detail in any file
+  contradicts one; each constraint names how it's checked; details
+  reference the core rather than restating it.
+- [ ] **Brevity** — no detail that doesn't change a decision; non-load-
+  bearing material is pushed out of band and referenced, not restated.
+  Flag bloat that buries the load-bearing core.
 
 ### 2. Scorecard
 
