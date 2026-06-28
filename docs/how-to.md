@@ -99,12 +99,12 @@ Read the ticket.  Then fill in:
 -   `README.md` *Why* — the problem this solves; distil it, don't
     paste the ticket.
 -   `README.md` *Invariants & constraints* — the non-negotiables the
-    feature must hold (the plan's constitution): hard limits, contracts,
-    must-not-breaks.  Keep it short; everything else is subordinate.
-    Make each *checkable* and name how (a test, a DoD item, a grep) — a
-    prose constraint nobody can check is the one a later edit quietly
-    breaks.  Changing a constraint later is a deliberate act that
-    re-opens review, not a side effect of a fix.
+    feature must hold: hard limits, contracts, must-not-breaks.  Keep it
+    short; everything else is subordinate.  Make each *checkable* and name
+    how (a test, a DoD item, a grep) — a prose constraint nobody can check
+    is the one a later edit quietly breaks.  (Why this is the plan's
+    constitution, and why you confirm it before continuing, is the next
+    subsection.)
 -   `README.md` *Options considered* — the table of alternatives
     and trade-offs, with *Preferred* named.  Include options the
     ticket didn't mention if you see them — this is the place
@@ -149,26 +149,11 @@ For every load-bearing assumption of the preferred solution,
 record a block in `feasibility.md`.  An assumption is load-bearing
 if the plan dies when it fails.
 
-Format:
-
-```markdown
-#### <short label>
-
-- **Assumption:** <one sentence — what must be true for the plan to work>
-- **Failure-mode:** <observable thing that would be different if false>
-- **Command:** `<single shell command, copy-pasteable>`
-- **Env:** <runtime version, distro, dependencies — whatever
-  makes the verification reproducible>
-- **Expected exit:** 0
-- **Observed exit:** 0
-- **Observed output:**
-  ```
-  <last ~10 lines of stdout/stderr that prove the assumption>
-  ```
-- **Recorded:** YYYY-MM-DD by <username>
-```
-
-Worked example:
+The verified-block format — the labelled `Assumption` /
+`Failure-mode` / `Command` / `Env` / `Expected exit` /
+`Observed exit` / `Observed output` / `Recorded` fields — lives in
+[`../templates/feasibility.md`](../templates/feasibility.md); copy a
+block from there rather than re-typing it.  A worked example:
 
 ```markdown
 #### PostgreSQL 16 supports new_index_type

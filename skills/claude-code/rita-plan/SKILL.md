@@ -74,10 +74,9 @@ cp -r <skill-dir>/templates <component>/docs/features/<TICKET-ID>-<slug>/
 ```
 
 `<skill-dir>` is the directory containing this `SKILL.md` —
-typically `~/.claude/skills/rita-plan/`.  Then set the
-frontmatter in the new `README.md` (Ticket, `Status: Plan`,
-`Last reviewed: <today>`).  Don't fill in the body yet —
-how-to.md's Phase 1 directs what to fill where.
+typically `~/.claude/skills/rita-plan/`.  Then set up the new
+folder per how-to.md §1 (the `README.md` frontmatter; don't fill
+in the body yet — Phase 1 directs what goes where).
 
 ### D. Walk the six lifecycle phases
 

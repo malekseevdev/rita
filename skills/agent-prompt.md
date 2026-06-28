@@ -62,9 +62,8 @@ From the user's project root:
 cp -r <RITA-ROOT>/templates <component>/docs/features/<TICKET-ID>-<slug>/
 ```
 
-Set the frontmatter in `README.md` (Ticket, `Status: Plan`,
-`Last reviewed: <today>`).  Don't fill in the body yet —
-later phases direct what to fill when.
+Then set up the new folder per how-to.md §1 (the `README.md`
+frontmatter; don't fill in the body yet).
 
 ### D. Walk the six lifecycle phases
 
