@@ -86,11 +86,14 @@ improvements:
 - **Options → Preferred soundness** — *Preferred* follows from the stated
   trade-offs; rejected options are rejected for reasons that hold; it's
   the right choice, not merely the most-obvious-from-the-code one.
-- **Constraint coherence** — if the feature has real non-negotiables, an
-  *Invariants & constraints* block declares them, each names how it's
-  checked, and no detail anywhere contradicts one (details reference the
-  core, not restate it). A missing or prose-only constitution where the
-  feature clearly has hard limits is a gap (dock *honesty*).
+- **Core coherence (idea + constraints)** — the plan's core is the
+  *guiding idea* (*Preferred*) plus the *Invariants & constraints*. No
+  detail should drift from the guiding idea (quietly pursue a different
+  approach than *Preferred*) or contradict a constraint — details
+  reference the core, not restate it. If the feature has real
+  non-negotiables, an *Invariants & constraints* block declares them and
+  each names how it's checked; a missing or prose-only constitution where
+  the feature clearly has hard limits is a gap (dock *honesty*).
 - **Brevity** — detail that doesn't change a decision is bloat: it buries
   the load-bearing core and invites drift. Reward plans that push
   non-load-bearing material out of band and reference it; dock padding and

@@ -87,26 +87,26 @@ rules* at `docs/how-to.md#drafting-rules` throughout.
 The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
-    Why, Options considered + Preferred.
+    Why, *Invariants & constraints*, Options considered + Preferred,
+    Impact.  **Then stop at the constraint-approval checkpoint: have the
+    human approve or correct the *Invariants & constraints* (and
+    Preferred) before Phase 2** — they're the plan's constitution.  See
+    how-to §1 *Confirm the constraints before continuing* for the
+    no-non-negotiables and headless cases.
 -   Phase 2 (*Feasibility check*) → verify only the *genuinely
-    uncertain* (usually external) load-bearing assumptions; don't
-    prototype-and-test code the plan will ship, and don't verify the
-    self-evident — many features need no verified block.  A check you
-    *ran* that fails (*Observed ≠ Expected*) → loop back to phase 1.  An
-    assumption you can't verify (infra, production, a human answer) does
-    not block — flag it and write the full plan anyway.
+    uncertain* (usually external) load-bearing assumptions — many
+    features need no verified block.  The gate: a check you *ran* that
+    fails (*Observed ≠ Expected*) loops back to phase 1; an assumption you
+    *can't* verify does not block — flag it and write the full plan
+    anyway.  See how-to §2 for what earns a block and what doesn't.
 -   Phase 3 (*Plan review*) → fill in `plan.md`, then run the
-    **self-improvement loop**:
+    **self-improvement loop** (how-to §3 Pass 1 owns the loop and its
+    iteration cap):
     -   **Review** — spawn a fresh-context **subagent** (Agent/Task tool)
         to run `rita-review` on the folder, so the review reads what's on
         the page, not your authoring rationale.  It only *reviews* —
-        returns a scorecard + improvements, edits nothing.
-    -   **Apply** — *you* edit the docs to resolve each improvement and
-        failed check.  Don't argue with the review.
-    -   **Cap** — one revision pass (two iterations total: draft + one
-        fix), then hand to the human author/peer passes.  A guard against
-        churning; genuine `:warning: needs human input` items travel on as
-        open questions rather than blocking.
+        returns a scorecard + improvements, edits nothing; *you* then
+        apply them.
     -   **Invocation** — normally `/rita-review <folder>`, or
         `/<prefix>rita-review <folder>` under this skill's prefix; if the
         subagent can't invoke the skill, it reads `rita-review`'s
@@ -130,7 +130,9 @@ Once approved, the path is linear:
 When something is genuinely unknown, mark it
 `:warning: needs human input` with a one-line note.  Don't
 guess.  Group questions and ask the user in a single pass
-rather than scattering them.
+rather than scattering them.  Fold the Phase-1 constraint-approval
+checkpoint into this same pass — one interaction, before feasibility and
+`plan.md`.
 
 ## Boundaries
 
@@ -149,9 +151,13 @@ rather than scattering them.
 ## Reporting back
 
 After each lifecycle phase, summarise what was done in 2-3
-sentences plus the file diff.  Two artifacts deserve explicit
+sentences plus the file diff.  Three artifacts deserve explicit
 surfacing rather than just the diff:
 
+-   At the end of *Plan options* (phase 1): emit the *Invariants &
+    constraints* and the *Preferred* option and ask the human to approve
+    or correct them — the constraint-approval checkpoint (see section D
+    and how-to §1).
 -   At the end of *Feasibility check* (phase 2): emit each
     `feasibility.md` block you wrote, with its *Observed exit*
     and *Observed output*.  Feasibility blocks are the

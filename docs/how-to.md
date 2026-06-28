@@ -48,12 +48,14 @@ rule lives in [`rationale.md#drafting-pitfalls`](rationale.md#drafting-pitfalls)
     the doc; push the rest out of band — to code, tests, or the ticket —
     and reference it.  Detail that doesn't change a decision doesn't
     belong in the plan.
--   **Keep details subordinate to the constraints.**  The *Invariants &
-    constraints* block is the plan's constitution: on conflict a
-    constraint wins, and a detail that contradicts one is a bug in the
-    detail, not a new fact.  State each constraint as something
-    *checkable* (a test, a DoD item, a `drift_check --refs` grep) and
-    reference it elsewhere rather than restating it.
+-   **Keep details subordinate to the core.**  The plan's core is the
+    *guiding idea* (the *Preferred* approach) plus the *Invariants &
+    constraints*.  Every detail is a move in service of the idea and must
+    not contradict a constraint — a detail that drifts from the idea, or
+    breaks a constraint, is a bug in the detail, not a new fact.  State
+    each constraint as something *checkable* (a test, a DoD item, a
+    `drift_check --refs` grep) and reference the core rather than
+    restating it.
 -   **Ground every API/schema proposal in the closest existing
     precedent.**  Name the precedent in the plan so the reviewer
     has something concrete to compare against.  Divergence is
@@ -113,8 +115,33 @@ Read the ticket.  Then fill in:
     this feature affects.  This is evergreen; on-call and future
     modifiers will read it.
 
-Stop here and move to section 2.  Don't fill in `plan.md` yet —
-feasibility may invalidate the preferred approach.
+### Confirm the constraints before continuing
+
+The *Invariants & constraints* are the plan's constitution — everything
+downstream is built to preserve them, so a misread here is as expensive
+as a wrong feasibility assumption.  Before going further, **surface the
+*Invariants & constraints* (and the *Preferred* option) to the human and
+get an explicit approve-or-correct.**  The user owns the non-negotiables:
+they carry institutional knowledge the codebase can't reveal — a contract
+you don't know about, a limit that was never written down, a "we can
+never break X."
+
+-   Present each constraint crisply and ask *approve / edit / add one?*
+    Fold this into the **same pass** as your Phase-1 clarifying questions
+    — one interaction, not a new gate.
+-   If the feature genuinely has no non-negotiables (the section is empty
+    or short per the precedence rule), there's nothing to approve — skip
+    it.
+-   **Headless / autonomous (no human in the loop):** don't block.  Mark
+    the constraints `:warning: needs human input — confirm before build`
+    and proceed, exactly as for an unverifiable feasibility assumption.
+
+A constraint approved here is the thing later review (and `rita-review`)
+holds the plan against; changing one afterwards is a deliberate act that
+re-opens review, not a side effect of a fix.
+
+Then move to section 2.  Don't fill in `plan.md` yet — feasibility may
+invalidate the preferred approach.
 
 ## 2. Feasibility check
 

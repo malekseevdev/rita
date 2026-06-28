@@ -52,7 +52,7 @@ with a one-line reason for any fail:
   one-line note; clarifying questions are grouped, not scattered.
 - [ ] **Consistency** — the doc set agrees with itself, along three axes.
   A finding usually fits one; if it fits more than one, report it **once**,
-  under the most specific (constraint > internal-claim > cross-file).
+  under the most specific (core > internal-claim > cross-file).
   - *Cross-file* — no contradictions between README, feasibility, plan,
     metrics, runbook (a metric name, env var, or the preferred option vs
     what the plan implements, stated two ways).
@@ -60,9 +60,13 @@ with a one-line reason for any fail:
     another file makes *contingent*, and no behaviour described two ways
     (e.g. "disabled in seconds, no redeploy" flat in the Overview but
     flagged contingent in feasibility/plan). Name the two spots.
-  - *Constraint coherence* — if the feature has real non-negotiables,
-    *Invariants & constraints* is declared and short, no detail contradicts
-    one, each names how it's checked, and details reference the core rather
+  - *Core coherence (idea + constraints)* — the plan's core is the
+    *guiding idea* (*Preferred*) plus the *Invariants & constraints*. Flag
+    a detail that **drifts from the guiding idea** — no longer serves it,
+    or quietly pursues a different approach than *Preferred* — just as you
+    flag one that contradicts a constraint. If the feature has real
+    non-negotiables, *Invariants & constraints* is declared and short,
+    each names how it's checked, and details reference the core rather
     than restate it.
 - [ ] **Brevity** — no detail that doesn't change a decision; non-load-
   bearing material is pushed out of band and referenced, not restated.
