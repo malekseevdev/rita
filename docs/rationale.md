@@ -97,8 +97,8 @@ The format makes the check non-optional.
 The same instinct has a failure mode worth naming: a feasibility
 check is only worth writing when the outcome is genuinely
 *uncertain* — typically because it depends on something external
-(a version's behaviour, an API, a platform, real data, a service
-you don't own).  When a feature is self-contained and built on
+(see [`how-to.md#2-feasibility-check`](how-to.md#2-feasibility-check)
+for what external uncertainty covers).  When a feature is self-contained and built on
 well-understood in-house mechanics, agents (being eager to look
 rigorous) tend to *prototype the implementation and unit-test it*,
 then file that as feasibility.  Those blocks verify nothing anyone
