@@ -1,45 +1,42 @@
 # RITA-1: metrics
 
-See [`docs/how-to.md`](../docs/how-to.md#metric-definition-reference) for
-the four axes (usage, errors, performance, business).
+See [`docs/how-to.md`](../../../docs/how-to.md#metric-definition-reference)
+for the four axes (usage, errors, performance, business). Names are
+the planned shape; reconcile with the service's existing metric
+helper during implementation (don't invent parallel infra).
 
 | Metric (with tags) | Axis | Meaning | Threshold to watch |
 | --- | --- | --- | --- |
-| `search.ratelimit.decision,decision=allow\|throttle\|shadow_throttle` (counter) | usage / business | One increment per request, tagged by what the limiter decided. `throttle` = a `429` was returned (`enforce`); `shadow_throttle` = would-have-throttled but passed through (`shadow`); `allow` = under limit. | In `enforce`, a sudden jump in `throttle` across **many distinct IPs** = mis-tuned threshold → flip to `shadow`. Steady small `throttle` on few IPs = working as intended. |
-| `search.ratelimit.tracked_ips` (gauge) | performance | Number of IPs currently held in the bucket store. | Approaching `SEARCH_RATELIMIT_MAX_TRACKED_IPS` = high IP churn (possible rotating scraper) and constant LRU eviction. Alert near the cap. |
-| `search.ratelimit.check_latency` (timing) | performance | Time spent in the limiter check per request. | p95 should be sub-millisecond. p95 > ~5ms = lock contention or a bug; investigate. |
-| `search.ratelimit.errors,reason=no_client_ip\|config_unreadable\|internal` (counter) | errors | A fail-open event: the limiter could not run correctly and allowed the request. | Should be ~0. Any sustained nonzero rate means the limiter is effectively disabled for some traffic (e.g. IP header missing) — investigate immediately. |
-| `search.request.latency` (timing) — *existing/derived search latency* | business | The shared search latency the feature exists to protect. | p95 should hold or improve under abuse once `enforce` is on. Regression here is the signal the whole feature targets. |
+| `search.ratelimit.decision` (counter; `outcome=allowed\|throttled\|shadowed`) | usage / errors | One increment per `/search` request the limiter evaluated, by what it decided | `throttled` rate climbing toward legitimate traffic, or `>0` immediately after `enforce` when shadow predicted ~0 → limit too low |
+| `search.ratelimit.tracked_ips` (gauge) | performance | Current number of IP buckets held in the per-process map | Sustained near `SEARCH_RATELIMIT_MAXSIZE` → distinct-IP flood / possible header-spoof bypass |
+| `search.ratelimit.errors` (counter; `stage=extract_ip\|evaluate`) | errors | Limiter-internal exception caught → request was failed *open* | `>0` is a bug; request was served but the limiter is misbehaving |
+| `search.ratelimit.mode` (gauge; `mode=off\|shadow\|enforce`) | usage | Current enforcement mode (so a dashboard shows what's live) | Unexpected value vs. intended rollout stage |
+| `search.request.latency_p95` (timing; existing endpoint metric) | performance | `/search` p95 latency — the SLO the feature must not regress for under-limit traffic | p95 delta after enabling `shadow`/`enforce` vs. baseline |
 
-Tag cardinality note: `decision` and `errors.reason` are bounded
-low-cardinality enums. Do **not** tag by client IP (unbounded
-cardinality); IPs go in throttle *log lines* (rate-limited), not metric
-tags.
+**Business axis** — off the request path, so measured by comparison,
+not a counter. Incident class to count: **`/search` p95-latency SLO
+breaches attributed to single-client query volume**. Compare the
+**30-day count before `enforce`** against the **30-day count after**
+(re-checked at the T+30 and T+90 reviews). Success = that count
+trends to ~0 with no offsetting rise in legitimate-client `429`s
+(`search.ratelimit.decision{outcome=throttled}` against a known-good
+client list). Frozen values live in the ticket.
 
 ## Dashboards
 
-_(Link Grafana panels here once created — Phase 6. Planned panels: decision
-rates stacked by `decision`; tracked_ips vs cap; check_latency p95; errors
-by reason; search p95 overlaid with throttle rate.)_
+_(Link Grafana panels here once created: decision-rate-by-outcome,
+tracked_ips gauge, errors, p95 latency overlaid with mode.)_
 
 ## Baseline
 
-_(Record before flipping to `enforce` — frozen values live in the RITA-1
-ticket, not here:)_
+_(Record before enforcing — this is the load-bearing step that sets
+the limit:_
 
-- Search `request.latency` p50/p95 under normal load, and under the known
-  scraper incident if reproducible.
-- `shadow_throttle` count/rate observed during the shadow window for
-  normal traffic vs. the scraper pattern (this is what tunes the
-  threshold).
-- Typical `tracked_ips` for normal traffic.
+- `/search` p95 latency, current (pre-feature).
+- From **shadow mode**: the `throttled`-if-enforced rate per IP and
+  the count of distinct legitimate IPs that would have been rejected
+  at candidate `RATE`/`BURST` values. Choose values where that count
+  is **0**.
+- Peak `tracked_ips` under normal traffic, to size `MAXSIZE`.
 
-**Shadow→enforce gate (numeric exit criterion):** flip to `enforce` only
-once, over a representative shadow observation window, the
-`shadow_throttle` rate on *normal* traffic is **< 0.1% of `allow`+
-`shadow_throttle` requests** (i.e. fewer than 1 in 1000 legitimate
-requests would have been blocked) **while** the known scraper pattern *is*
-flagged `shadow_throttle`. If normal-traffic shadow_throttle exceeds that,
-raise `SEARCH_RATELIMIT_RATE`/`BURST` and re-observe before enforcing.
-:warning: **needs human input:** confirm 0.1% is an acceptable
-false-positive ceiling for this endpoint, or set the agreed value.
+_Values live in the ticket, frozen-in-time.)_

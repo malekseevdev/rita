@@ -5,205 +5,169 @@
 Options, trade-offs, and preferred solution live in
 [`README.md`](README.md) (evergreen). Load-bearing assumptions and
 verifications live in [`feasibility.md`](feasibility.md) (evergreen).
-This file is the working scratchpad — implementation logistics that don't
-outlive the launch.
+This file is the working scratchpad — implementation logistics that
+don't outlive the launch.
 
 ## Implementation steps
 
-Each step is independently mergeable and testable. The limiter is built
-defaulting to `shadow` (observe-only), so early steps ship with **zero**
-client-facing risk.
+1. **Token-bucket core** — a stdlib-only `TokenBucket`/`RateLimiter`
+   class: per-key `(tokens, last_refill)` state in a dict guarded by a
+   `threading.Lock`; lazy refill from `time.monotonic()` deltas;
+   `allow(key) -> (allowed: bool, retry_after: float)`. Capacity =
+   burst, refill = rate/sec. Unit-tested in isolation (no WSGI). —
+   *partial value: the algorithm is reviewable/testable on its own.*
+2. **Memory bounding** — cap the IP→bucket map at `MAXSIZE` and evict
+   idle entries (entry untouched for longer than its full refill
+   time can be dropped — it would be recreated full anyway). Enforces
+   the "memory-bounded" invariant. Test eviction under a flood of
+   distinct keys.
+3. **Mode + config plumbing** — read `SEARCH_RATELIMIT_*` settings
+   (mode, rate, burst, maxsize, ip-header) once at startup; expose
+   `mode` re-readable at request time so a flip takes effect without
+   restart (mechanism per how it's wired — env re-read or a watched
+   config value). Default mode `off`.
+4. **WSGI middleware** — wrap the `/search` WSGI callable. Extract the
+   client IP from the configured environ key; on `allow()==False`
+   and `mode==enforce`, short-circuit with `429` + `Retry-After`;
+   otherwise call through. In `shadow` mode, evaluate + emit metrics
+   but always call through. Wrap evaluation in try/except → on any
+   limiter-internal error, **fail open** (serve the request) and emit
+   the error metric. — *partial value: shippable in `shadow` mode here.*
+5. **Metrics** — emit the counters/gauges in
+   [`metrics.md`](metrics.md) (decisions, mode, tracked-IP gauge,
+   limiter errors), using the service's existing metrics helper if one
+   exists (do not invent parallel infra).
+6. **Tests + runbook** — implement every scenario in
+   [`test-cases.md`](test-cases.md); finalise [`runbook.md`](runbook.md)
+   with real metric/log queries.
 
-1. **Token-bucket core (pure, no WSGI).** A `TokenBucket` (capacity =
-   burst, refill rate = sustained/sec, using `time.monotonic`) and a
-   `BucketStore` keyed by client IP, backed by `collections.OrderedDict`
-   as a bounded LRU (cap `SEARCH_RATELIMIT_MAX_TRACKED_IPS`, evict
-   least-recently-used; lazy expiry of idle buckets). Guarded by a
-   `threading.Lock`. Unit-tested in isolation — no network. *(No
-   client-facing behavior yet.)*
-2. **IP extraction.** A function that derives the client key from the WSGI
-   `environ` using the confirmed forwarded header (see
-   [feasibility.md](feasibility.md) — header name is an open question).
-   Fail-open: if no usable IP is found, return a sentinel that the
-   limiter always allows, and increment an error metric. Unit-tested
-   against crafted `environ` dicts. *(No client-facing behavior yet.)*
-3. **Config + mode loader.** Reads `SEARCH_RATELIMIT_MODE`
-   (`off`/`shadow`/`enforce`) and the numeric settings from the
-   config source, re-reading on mtime change with a short cache so the
-   toggle flips without a redeploy. Invalid/missing → `shadow` (safe
-   default: observe, never block). Unit-tested. *(No client-facing
-   behavior yet.)*
-4. **WSGI middleware wiring + metrics + shadow rollout.** <!-- partial
-   value milestone --> Wrap the search WSGI app. In `off`: pass through.
-   In `shadow`: run the check, emit `decision=shadow_throttle` metrics and
-   a log line on would-be-throttle, but always pass through. In `enforce`:
-   return `429` with `Retry-After` when the bucket is empty. Emit all
-   metrics in [metrics.md](metrics.md). **Shipping this in `shadow`
-   delivers partial value immediately**: real data on who *would* be
-   throttled, used to tune the threshold before any user is affected.
-5. **Tune + flip to `enforce`.** Using shadow data and the answers to the
-   feasibility flags (worker count → per-worker rate), set the rate/burst
-   and flip the mode to `enforce`. Backed by the test-cases in
-   [test-cases.md](test-cases.md).
-6. **Dashboards + runbook finalization.** Wire the metrics into a Grafana
-   panel and confirm the runbook diagnostic steps execute.
+Steps 1–2 are pure unit-testable logic. Step 4 in `shadow` mode is the
+first deployable increment that produces the baseline needed to set
+the real limit (see Deployment plan).
 
 ## Concerns
 
-- **Performance** — Per request: one dict lookup + arithmetic under a
-  short-held lock. Sub-millisecond, negligible against search query
-  latency. The single global `Lock` could contend under very high
-  concurrency; acceptable for a "small, stable fleet." If contention shows
-  up, shard the store by IP hash (deferred — not needed now).
-- **Security** — The limiter trusts a forwarded header for the client IP.
-  **If the gateway passes a client-supplied `X-Forwarded-For` through
-  unmodified, the value is spoofable** — a scraper could rotate fake IPs
-  to evade its bucket or forge another client's IP. Mitigation: read only
-  the gateway-set value; this is the load-bearing open question in
-  [feasibility.md](feasibility.md). The limiter is a latency-protection
-  mechanism, not an auth boundary — it must not be relied on for access
-  control. No sensitive data is read or stored (only IPs, in memory).
-- **Data migration** — N/A. State is in-memory and per-process; nothing
-  persisted, nothing to migrate or roll back.
-- **Thread safety** — The per-IP store is shared across threads within a
-  worker; all mutation goes through one `threading.Lock`. Across
-  *processes* there is no shared state by design (stdlib-only, no Redis):
-  each worker has independent buckets, so the effective limit is
-  per-worker × worker count. This is documented, not a bug, but it is the
-  main correctness caveat (see feasibility worker-count flag).
-- **Scalability** — Memory is bounded by the LRU cap on tracked IPs;
-  beyond the cap, least-recently-used IPs are evicted (their buckets
-  reset). At 10× load the first things to watch are lock contention and
-  the eviction rate (high eviction = churn through many IPs, e.g. a
-  rotating scraper, which per-IP limiting cannot fully stop — a known
-  limitation, not solved here).
-- **Observability** — New metrics across usage/errors/performance plus the
-  protected-system signal (search p95). See [metrics.md](metrics.md). A
-  log line on every shadow/enforce throttle decision (rate-limited to
-  avoid log floods) names the IP and current bucket level.
-- **Failure modes** — Fail-open everywhere: if IP extraction fails, the
-  config is unreadable, or the limiter raises, the request is **allowed**
-  and an error metric increments. A limiter bug must never take down
-  search. Throttled clients see a loud, explicit `429` + `Retry-After`;
-  under-limit clients see no change.
-- **Operability** — Ops needs: the `SEARCH_RATELIMIT_MODE` toggle and how
-  to flip it without a deploy (the kill switch), the dashboard, and the
-  runbook. All delivered by this work ([runbook.md](runbook.md),
-  [metrics.md](metrics.md)).
+- **Performance** — adds a dict lookup, a lock acquire/release, and a
+  little arithmetic per `/search` request. Negligible vs. a search
+  query, but the single lock is a per-process serialization point;
+  under very high RPS consider sharding the lock by key hash. Assess
+  with the p95-latency delta in `shadow` mode before enforcing.
+- **Security** — the limiter *is* an abuse control, but it trusts the
+  client-IP source. If the IP comes from a client-settable forwarded
+  header that the gateway doesn't overwrite, an attacker rotates it to
+  get unlimited buckets and bypasses the limit (and inflates the
+  tracked-IP map). This is the load-bearing security question — see
+  the IP-source unknown in [`feasibility.md`](feasibility.md).
+- **Data migration** — N/A. No schema, no persisted state.
+- **Thread safety** — shared mutable state (the bucket map) is
+  accessed from concurrent WSGI worker threads; all reads/writes go
+  through one `threading.Lock`. State is per-process only — no
+  cross-process or cross-host sharing by design (Option A trade-off).
+- **Scalability** — at 10× load the first thing to strain is lock
+  contention (above) and the tracked-IP map under a distinct-IP flood;
+  `MAXSIZE` + eviction bound the memory, but eviction churn itself
+  costs CPU. The per-process model means the *effective* limit scales
+  with worker count, not down — see the worker-multiplier item in
+  README Impact.
+- **Observability** — decision counter (allowed/throttled/shadowed),
+  current mode, tracked-IP gauge, and limiter-error counter; all in
+  [`metrics.md`](metrics.md). `shadow` mode exists specifically so we
+  can observe would-be-throttles before any user is affected.
+- **Failure modes** — limiter bug or exhaustion → fail *open* (request
+  served, error metric incremented); the endpoint never 500s because
+  of the limiter (invariant). A *misconfigured* low limit → legitimate
+  users get `429`; mitigated by shadow-first rollout and the
+  seconds-fast mode flip.
+- **Operability** — on-call needs: how to read the mode, how to flip
+  it to `off`/`shadow`, and which metrics show a misfire. Covered in
+  [`runbook.md`](runbook.md).
 
 ## Dependencies
 
 | Dependency           | Type        | Status      |
 | -------------------- | ----------- | ----------- |
-| Gateway team — confirm forwarded-IP header name + trust/overwrite behavior (feasibility flag #1) | blocks us (correct keying + security) | not started |
-| Platform/ops — worker & host count, and config-push mechanism without redeploy (feasibility flags #2, #3) | blocks us (threshold tuning + kill switch) | not started |
-| Metrics/observability pipeline — scrape the new metrics; Grafana panel | we block (dashboard) | not started |
+| Confirm client-IP environ key + gateway trust (feasibility) | blocks `enforce` (not `shadow`) | needs human input |
+| Worker count per host (feasibility) | blocks limit-value choice | needs human input |
+| Existing metrics helper / emit path in the search service | blocks step 5 | unknown — no code in repo yet |
+| Live config-reload mechanism for `MODE` (feasibility) | blocks the "seconds" kill-switch claim | needs human input |
 
-The first two block flipping to `enforce`, **not** shipping in `shadow`.
-Shadow mode can deploy as soon as steps 1–4 are merged, which is how we
-de-risk the unknowns.
+We block: nothing. No downstream consumer depends on this.
 
 ## Deployment plan
 
-- **Runtime toggle — `SEARCH_RATELIMIT_MODE` (tri-state, not a plain
-  flag).** Values: `off` | `shadow` | `enforce`. This single setting plays
-  two roles deliberately:
-  - *Feature-flag role:* first deploy ships in `shadow`, so new
-    client-facing behavior (the `429`) is gated off until we flip to
-    `enforce`. This matches "add a feature flag when the change has
-    client-facing behavior with non-trivial blast radius."
-  - *Kill-switch role:* setting it back to `shadow` or `off` instantly
-    disables enforcement in an emergency — the ticket's core ask.
-  - *Why one tri-state instead of a `FEATURE_*` flag + a `KILL_*` switch:*
-    `off`/`shadow`/`enforce` are mutually exclusive states of one concept
-    ("how much limiting is active"); two booleans would have a meaningless
-    fourth combination and a more confusing kill path. Naming note: this
-    deviates from the `FEATURE_`/`KILL_` prefix convention on purpose; the
-    `SEARCH_RATELIMIT_MODE` name makes the three states legible to oncall.
-    There is no existing config precedent in this (greenfield) service to
-    match against. :warning: **needs human input:** confirm this naming
-    fits the service's config conventions once they exist.
-  - *Lifecycle:* the kill-switch role is kept indefinitely (it's the "melt
-    down at 3 AM" mitigation). There is no separate flag to remove later —
-    `shadow` remains a useful permanent diagnostic mode.
-  - *No-redeploy requirement:* the toggle must be changeable without a
-    code deploy — see feasibility flag #3; the reload mechanism depends on
-    the ops answer.
-- **Other settings:** `SEARCH_RATELIMIT_RATE` (sustained req/sec per IP
-  *per worker*), `SEARCH_RATELIMIT_BURST` (bucket capacity),
-  `SEARCH_RATELIMIT_MAX_TRACKED_IPS` (LRU cap). Defaults set conservatively
-  high after shadow data; placeholders until then.
-- **Rollout stages** (fleet is small/stable → big-bang deploy gated by
-  mode is appropriate; no per-percentage traffic infra needed):
-  1. Deploy in `shadow` to all hosts. Watch for ~a representative traffic
-     window.
-  2. Tune rate/burst from shadow data (target: shadow_throttle near-zero
-     for normal traffic, non-zero for the known scraper pattern).
-  3. Flip `SEARCH_RATELIMIT_MODE=enforce` (no redeploy).
-- **Monitoring to watch at each stage** (error/perf signals move fast;
-  these are the ones to gate on — see [metrics.md](metrics.md)):
-  - `search.ratelimit.decision{decision=...}` rates (esp. `throttle` /
-    `shadow_throttle`).
-  - `search.ratelimit.errors` (fail-open events — should be ~0).
-  - `search.ratelimit.check_latency` p95 (should be sub-ms).
-  - **Search overall p95 latency** — the thing we're protecting; it should
-    improve or hold under abuse once enforcing.
-  - Distinct throttled IPs (a sudden spike across *many* IPs after
-    enforce = mis-tuned threshold → flip back to `shadow`).
+**Runtime toggle — a permanent mode setting (not a temporary flag).**
+`SEARCH_RATELIMIT_MODE ∈ {off, shadow, enforce}`, default **`off`**.
+
+- It gates new client-facing behaviour during rollout (`off → shadow →
+  enforce`), the feature-flag role.
+- It is **kept indefinitely** as the emergency off-switch (flip
+  `enforce → off`/`shadow` in seconds, no deploy) — the kill-switch
+  role the ticket asks for.
+
+A single tri-state setting is chosen over two booleans because the
+states are mutually exclusive and `shadow` (the safe middle) must be
+first-class. It deliberately departs from the `FEATURE_`/`KILL_`
+naming convention because it is neither purely temporary nor purely
+emergency — it is a permanent operational mode. The other settings:
+`SEARCH_RATELIMIT_RATE` (sustained req/s per IP), `_BURST` (bucket
+capacity), `_MAXSIZE` (max tracked IPs), `_IP_HEADER` (environ key).
+
+**Rollout stages** (gradual; blast radius is all `/search` users):
+
+1. **Deploy in `off`** — code present, zero behaviour change.
+2. **`shadow` in staging, then production** — limiter evaluates and
+   emits metrics but never rejects. Watch the *would-throttle* rate
+   and tracked-IP gauge. Set the real `RATE`/`BURST` from this
+   baseline so that **0 legitimate clients would be rejected**
+   (invariant). This step resolves the "what limit?" question with
+   data instead of a guess.
+3. **`enforce` for a small slice, then full** — flip to `enforce`;
+   watch the throttle rate, `/search` p95 latency, and the 5xx rate.
+   Roll to 100% once the throttle rate matches the shadow prediction
+   and latency is unchanged for under-limit traffic.
+
+**Signals to watch** (from [`metrics.md`](metrics.md), error/perf
+first — usage/business move slower): `search.ratelimit.decision`
+(throttled vs allowed), `/search` p95 latency delta, `/search` 5xx
+rate, `search.ratelimit.errors`, `search.ratelimit.tracked_ips`.
 
 ## Rollback strategy
 
-- **Primary: toggle flip.** `SEARCH_RATELIMIT_MODE=shadow` (keep
-  observing) or `off` (full stop) — seconds, no redeploy, no restart
-  (assuming feasibility flag #3 is satisfied).
-- **Contingency if flag #3 resolves to "env-var-at-start-only"** (i.e. the
-  mode genuinely cannot be changed without touching the process): the
-  guaranteed fast path becomes a **process restart with
-  `SEARCH_RATELIMIT_MODE=off`** set in the environment (rolling restart
-  across the small fleet — tens of seconds to low minutes, still far
-  faster than the code-deploy that is today's only option), with a
-  **SIGHUP-triggered config reload** added in implementation as the
-  preferred mechanism if the host setup allows it. The "seconds, no
-  redeploy" claim above holds only if a writable config source or SIGHUP
-  reload is available; this contingency ensures a fast off-switch exists
-  *either way*, satisfying the ticket's core ask.
-- **Secondary: revert + redeploy** the middleware wiring if the toggle
-  path itself is broken — minutes.
-- **Blast radius while broken:** worst case is over-throttling legitimate
-  users (they get `429`s). Bounded by the toggle flip above. Fail-open
-  design means a *limiter crash* degrades to "no limiting," never to "no
-  search."
-- **Data at risk:** none. All state is in-memory; rollback loses only the
-  transient buckets, which simply rebuild. No corrupted persistent state
-  can survive a rollback.
+- **Primary: mode flip** — `enforce → shadow` (keep observing, stop
+  rejecting) or `→ off` (fully disabled). Seconds, no deploy. This is
+  the realistic failure path (limit set too low → legitimate `429`s)
+  and it is cheaply reversible, which is why a percentage rollout —
+  not more gates — is sufficient.
+- **Secondary: revert + redeploy** — if the middleware itself is
+  faulty in a way the mode flip doesn't neutralise. Minutes.
+- **Data at risk:** none. State is in-memory and per-process; a
+  restart or rollback simply drops all buckets (clients start fresh).
 
 ## Definition of done
 
-- [ ] Plan reviewed and approved (agent self-review + author + peer).
-- [ ] `README.md` "Options considered" + "Preferred" finalised, and the
-      "How it works"/"System interactions"/"Configuration" sections filled
-      with file:line references to the shipped middleware.
-- [ ] `feasibility.md` frozen; the three external-unknown flags resolved
-      (gateway header confirmed, worker count known, config-push path
-      confirmed) and any that turned into verifiable facts recorded.
-- [ ] `SEARCH_RATELIMIT_MODE` setting exists, reads `off`/`shadow`/
-      `enforce`, defaults to `shadow`, and is changeable without a redeploy
-      (verified by changing it on a host and observing a request's decision
-      flip).
-- [ ] `GET /search` returns `429` with a `Retry-After` header for an IP
-      that exceeds `SEARCH_RATELIMIT_RATE`/`BURST` in `enforce` mode, and
-      `200` for the same load in `shadow`/`off`.
-- [ ] A distinct second IP under the limit still gets `200` while the first
-      is throttled (isolation), proven by a test in `test-cases.md`.
-- [ ] Every scenario in `test-cases.md` is backed by an implemented test.
-- [ ] Metrics `search.ratelimit.decision`, `.errors`, `.check_latency`,
-      `.tracked_ips` are emitted and listed in `metrics.md` with thresholds
-      + a dashboard link.
-- [ ] Baseline values (pre-enforce search p95, shadow throttle counts)
-      recorded in the RITA-1 ticket.
-- [ ] `runbook.md` covers: "legit users getting 429s," "limiter not
-      throttling a known abuser," and "how to flip the kill switch."
-- [ ] `plan.md` deleted.
-- [ ] Deployment plan followed (shadow → tune → enforce); rollback
-      strategy documented in the ticket.
-- [ ] Concerns checklist has no unresolved items.
+- [ ] Plan reviewed and approved before implementation started
+- [ ] `README.md` "Options considered" + "Preferred" finalised
+- [ ] `feasibility.md` frozen; the three external unknowns resolved by
+      a human (IP environ key + gateway trust; worker count; WSGI
+      entry point) — recorded in the ticket
+- [ ] `README.md` "How it works" / "System interactions" /
+      "Configuration" filled with file:line refs to the shipped code
+- [ ] Limiter uses **standard library only** — CI grep over the
+      limiter module shows no third-party imports; `requirements.txt`
+      unchanged
+- [ ] `429` response carries a `Retry-After` header (test
+      `test_ratelimit.py::test_throttled_sets_retry_after`)
+- [ ] Limiter-internal exception → request still served, not `500`
+      (test `test_ratelimit.py::test_fails_open_on_error`)
+- [ ] Tracked-IP map is bounded at `SEARCH_RATELIMIT_MAXSIZE` under a
+      distinct-IP flood (test `test_ratelimit.py::test_map_bounded`)
+- [ ] `SEARCH_RATELIMIT_MODE` flip (`enforce`→`off`) takes effect
+      without a redeploy (runbook one-shot verified)
+- [ ] `plan.md` deleted
+- [ ] Metrics in `metrics.md` (decision, mode, tracked_ips, errors)
+      emitted and listed with thresholds + dashboard link
+- [ ] Shadow-mode baseline recorded in the ticket; chosen `RATE`/
+      `BURST` shown to reject 0 legitimate clients at that baseline
+- [ ] Runbook covers: misfire (legit users throttled), bypass
+      (limit never trips), and limiter errors
+- [ ] Concerns checklist has no unresolved items

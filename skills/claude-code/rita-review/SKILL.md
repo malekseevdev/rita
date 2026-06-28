@@ -50,16 +50,23 @@ with a one-line reason for any fail:
   genuinely uncertain.
 - [ ] **Unknowns flagged** — every `:warning: needs human input` has a
   one-line note; clarifying questions are grouped, not scattered.
-- [ ] **Cross-file consistency** — no contradictions between README,
-  feasibility, plan, metrics, runbook (metric names, env vars, the
-  preferred option vs what the plan implements).
-- [ ] **Internal-claim consistency** — no claim stated *unconditionally*
-  in one place that another file makes *contingent*, and no behaviour
-  described two ways. The common tells: a capability asserted flatly in
-  the Overview ("disabled in seconds, no redeploy") that feasibility/plan
-  flag as depending on an unverified assumption; a value or behaviour
-  (a threshold, an off-state, a default) described one way in one doc and
-  differently in another. Name the two spots that disagree.
+- [ ] **Consistency** — the doc set agrees with itself, along three axes.
+  A finding usually fits one; if it fits more than one, report it **once**,
+  under the most specific (constraint > internal-claim > cross-file).
+  - *Cross-file* — no contradictions between README, feasibility, plan,
+    metrics, runbook (a metric name, env var, or the preferred option vs
+    what the plan implements, stated two ways).
+  - *Internal-claim* — no claim made *unconditionally* in one place that
+    another file makes *contingent*, and no behaviour described two ways
+    (e.g. "disabled in seconds, no redeploy" flat in the Overview but
+    flagged contingent in feasibility/plan). Name the two spots.
+  - *Constraint coherence* — if the feature has real non-negotiables,
+    *Invariants & constraints* is declared and short, no detail contradicts
+    one, each names how it's checked, and details reference the core rather
+    than restate it.
+- [ ] **Brevity** — no detail that doesn't change a decision; non-load-
+  bearing material is pushed out of band and referenced, not restated.
+  Flag bloat that buries the load-bearing core.
 
 ### 2. Scorecard
 

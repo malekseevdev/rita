@@ -1,103 +1,101 @@
 # RITA-1: feasibility
 
-Record every load-bearing assumption of the preferred solution and verify
-each with the smallest possible test. An assumption is load-bearing if the
-plan dies when it fails.
+Record every load-bearing assumption of the preferred solution and
+verify each with the smallest possible test. An assumption is
+load-bearing if the plan dies when it fails.
 
-This file stays in the folder after shipping — it's the record of what was
-true at planning time.
+This file stays in the folder after shipping — it's the record of
+what was true at planning time.
+
+See [`docs/how-to.md`](../../../docs/how-to.md#2-feasibility-check)
+for the reasoning.
 
 ## Verified blocks
 
-**None.** This is the honest result for this feature, not a gap.
+**None.** The preferred approach (A) is an in-process token bucket
+built on stdlib primitives (`threading.Lock`, `time.monotonic`, a
+plain dict). Whether those primitives exist and behave as documented
+is self-evident for a competent engineer — verifying them would be
+noise, not signal — and that a token bucket enforces its own limit is
+*test-cases.md* territory, written with the implementation, not a
+feasibility check.
 
-Every assumption the preferred design (in-process stdlib token bucket)
-depends on falls into one of two buckets, and neither is a feasibility
-check:
-
-- **It's our own code.** "A token bucket caps sustained rate while
-  allowing bursts," "the WSGI middleware can read the forwarded header
-  from `environ` and return a `429`," "an `OrderedDict` LRU bounds memory,"
-  "a config file re-read on mtime change flips the mode without a
-  restart." A competent engineer is not *uncertain* about these — they are
-  the thing we are building. They are verified by the tests in
-  [test-cases.md](test-cases.md), written with the implementation, not by
-  prototyping the design now.
-- **It's the production environment, which can't be checked from here.**
-  The forwarded-IP header contract, the worker/host count, and the
-  config-push mechanism are properties of infra this planning box does not
-  run. A command run locally would prove nothing about production — that
-  is local-proxying a production fact. These are flagged below, not faked
-  as verified blocks.
-
-The stdlib primitives the design uses (`time.monotonic`,
-`threading.Lock`, `collections.OrderedDict`, the WSGI `environ`/
-`start_response` contract) are present in every supported Python 3 and are
-self-evident; verifying them would be noise. Planning box is Python 3.12.3
-for reference.
+The assumptions that *are* genuinely uncertain here all depend on the
+production/gateway environment, which cannot be checked meaningfully
+from the planning box (and there is no service code in this repo
+yet). They are flagged below rather than faked as verified blocks.
 
 ## Unverified external unknowns (need human input)
 
-These are load-bearing: each can break correct behavior, and none can be
-honestly checked from the planning environment. They do **not** block
-writing the plan, but they must be answered before tuning the threshold
-and before flipping to `enforce`.
+#### Client IP source in the WSGI environ
 
-#### Gateway forwarded-IP header (most important)
+- **Assumption:** The gateway forwards the real client IP to the
+  search app, and it arrives in a known WSGI environ key
+  (`REMOTE_ADDR`, or a forwarded header such as
+  `HTTP_X_FORWARDED_FOR` / `HTTP_X_REAL_IP`) that the middleware can
+  read to key buckets per client.
+- **Failure-mode:** If we key on the wrong field, every request keys
+  to the *gateway's* IP (or a proxy hop), so all clients share one
+  bucket — the limiter would throttle the entire user base as a
+  single "client", or never trigger at all. This directly breaks the
+  "normal clients are never throttled" invariant.
+- **Why unverified:** Depends on gateway configuration and the
+  deployed WSGI stack, neither of which is in this repo or runnable
+  from the planning environment. The ticket states "clients are keyed
+  by IP (the gateway forwards it)" but does not name the header.
+- :warning: **needs human input:** Which environ key carries the
+  client IP in production, and is it trustworthy (set by *our*
+  gateway, not spoofable by the client)? If it's a forwarded header,
+  confirm the gateway strips/overwrites any client-supplied value —
+  otherwise an attacker rotates the header to dodge the limit.
 
-- **Assumption:** The gateway forwards the real client IP in a specific,
-  trustworthy header (the design assumes a gateway-set `X-Forwarded-For`,
-  reading the correct entry), and the search WSGI app can read it from the
-  WSGI `environ` (e.g. `HTTP_X_FORWARDED_FOR`).
-- **Failure-mode:** If the app reads `REMOTE_ADDR` instead, every client
-  collapses to the *gateway's* IP → one shared bucket → either everyone is
-  throttled together or no one is (limiter useless or catastrophic). If
-  the gateway passes through a *client-supplied* `X-Forwarded-For` without
-  overwriting it, a scraper can spoof the header to evade its own limit or
-  to frame another IP.
-- **Why unverified:** The header name and the gateway's trust behavior
-  (does it strip/overwrite client-sent `X-Forwarded-For`, or append?) are
-  properties of the gateway config, which this planning box does not run
-  and cannot inspect.
-- :warning: **needs human input:** (1) Exactly which header carries the
-  client IP, and what is its WSGI `environ` key? (2) Does the gateway
-  guarantee that value is gateway-set and not client-spoofable (e.g. does
-  it overwrite any inbound `X-Forwarded-For`)? If it appends, which entry
-  is the trustworthy client IP — left-most untrusted, or right-most?
+#### Worker / process count per host
 
-#### Worker / host count (sets the effective limit)
+- **Assumption:** The deployed worker count *N* per host is small and
+  stable (ticket: "the fleet is small and stable today"), so
+  per-process buckets give a predictable effective limit of roughly
+  *N* × the per-process rate.
+- **Failure-mode:** If *N* is large or autoscaling, the effective
+  per-client ceiling is much higher than configured (under-throttle),
+  or unpredictable — the configured limit can't be reasoned about.
+- **Why unverified:** This is a deployment topology fact (WSGI server
+  config / process manager), not something the planning box can
+  observe.
+- :warning: **needs human input:** What is the worker/process count
+  per host, and is it fixed or autoscaled? This sets the multiplier
+  used to derive the configured limit and the `metrics.md`
+  thresholds.
 
-- **Assumption:** We know how many WSGI worker processes run per host and
-  how many hosts serve `GET /search`, so the per-worker token-bucket rate
-  can be set to produce the intended *fleet-wide* per-IP limit.
-- **Failure-mode:** Buckets are per-process (no shared store — that's the
-  stdlib-only constraint). If a client's requests are load-balanced across
-  N workers, its effective allowance is up to N× the per-worker rate. Set
-  the per-worker rate without knowing N and the real limit is N× too high
-  (abuse still degrades latency) or, if N is misjudged downward, too low
-  (legit users throttled).
-- **Why unverified:** Worker/host topology is a deployment property
-  (process manager config, autoscaling) not visible from the repo.
-- :warning: **needs human input:** How many worker processes per host, how
-  many hosts, and does the gateway pin a client IP to one worker (sticky)
-  or spray across all? If sprayed, the per-worker rate = target ÷
-  (workers × hosts).
+#### Live mode flip without a restart
 
-#### Config-push path for the kill switch (no-redeploy requirement)
+- **Assumption:** Changing `SEARCH_RATELIMIT_MODE` takes effect on the
+  running process *without* a redeploy/restart — i.e. the deployed
+  stack has a mechanism (env re-read on a signal, a watched
+  config file/value, or a control endpoint) the mode can be re-read
+  through at request time.
+- **Failure-mode:** If the setting is only read once at startup, the
+  "disable in seconds" / kill-switch invariant is false — disabling a
+  misfire would require a redeploy, which is exactly the slow path the
+  ticket wants to avoid.
+- **Why unverified:** Depends on how the deployed WSGI stack manages
+  config (process manager, env, config service) — none of which is in
+  this repo. The ticket asks for a fast off-switch but doesn't specify
+  the config mechanism.
+- :warning: **needs human input:** How does the deployed stack reload
+  a setting live? If there is none, either add one (a watched value /
+  control endpoint) or downgrade the kill-switch claim to
+  "redeploy-fast" — this changes README's "in seconds" wording and the
+  `test_mode_flip_takes_effect_live` test.
 
-- **Assumption:** Operators can change `SEARCH_RATELIMIT_MODE` and have
-  running processes pick it up **without a redeploy** — the design reads
-  the mode from a config file/source the app re-reads on a short interval
-  or mtime change. This requires that such a file exists on the hosts and
-  is writable/pushable by ops out-of-band of a code deploy.
-- **Failure-mode:** If the mode can only be set via an environment
-  variable read at process start, then "turn enforcement off quickly"
-  still requires a restart/redeploy — defeating the ticket's core ask
-  (today's only mitigation is a deploy).
-- **Why unverified:** Whether the prod filesystem is writable by ops and
-  how config is pushed (config-management tool, mounted secret, etc.) is
-  infra this planning box does not run.
-- :warning: **needs human input:** What is the supported mechanism to
-  change a runtime setting on the search hosts without a code deploy
-  (writable config file + reload? a config service? SIGHUP)? The
-  implementation's reload strategy depends on the answer.
+#### `/search` is a wrappable plain WSGI app
+
+- **Assumption:** `GET /search` is served by a plain WSGI callable the
+  limiter can wrap as outer middleware (per ticket: "a plain WSGI app,
+  not a framework").
+- **Failure-mode:** If the entry point is not a standard WSGI
+  callable, the middleware-wrapping integration point in the plan
+  doesn't exist and the implementation step changes.
+- **Why unverified:** No service code is present in this repo yet to
+  inspect; relying on the ticket's statement.
+- :warning: **needs human input:** Confirm the WSGI entry point /
+  module to wrap (so implementation step 4 can name the file).

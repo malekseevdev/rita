@@ -22,6 +22,18 @@ has never heard of it.
 
 The problem this solves.  Don't paste the ticket — distil it.
 
+## Invariants & constraints
+
+The non-negotiables this feature must hold — the plan's constitution.
+Keep it short; everything below is subordinate.  On conflict a constraint
+wins — a detail that contradicts one is a bug in the detail, not a new
+fact.  State each as something *checkable*, and reference it elsewhere
+rather than restating it.
+
+| Constraint | Why it's load-bearing | How it's checked |
+| ---------- | --------------------- | ---------------- |
+| e.g. standard library only — no new runtime deps | keeps it self-contained / installable anywhere | `grep` deps; DoD item; feasibility block |
+
 ## Options considered
 
 | Option        | Pros                | Cons                  |
