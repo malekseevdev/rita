@@ -33,7 +33,10 @@ feature folder — say so and stop.
 ### 1. Self-review checklist
 
 Re-read the doc set against the framework and report pass/fail per item,
-with a one-line reason for any fail:
+with a one-line reason for any fail. This is the pass/fail gate; for the
+qualitative criteria below (feasibility, coherence, brevity) apply the
+matching [`RUBRIC.md`](RUBRIC.md) definition rather than restating it —
+the scorecard (§2) then scores those same criteria 0–5.
 
 - [ ] **Sections filled** — every section each file owns is filled in
   (no skipped/placeholder sections except those explicitly deferred to
@@ -41,13 +44,11 @@ with a one-line reason for any fail:
 - [ ] **Drafting rules applied** — for each rule in
   `docs/how-to.md#drafting-rules`, it's applied (name where) or noted as
   not-applicable and why.
-- [ ] **Feasibility is honest** — blocks verify *genuine, usually
-  external* uncertainty; no trivial blocks (verifying the self-evident,
-  or local-proxying a production fact) and no tests of the plan's own
-  code dressed as feasibility; any verified block has *Observed ==
-  Expected*; unverifiable assumptions are flagged `:warning: needs human
-  input`, not faked. Zero verified blocks is fine when nothing is
-  genuinely uncertain.
+- [ ] **Feasibility is honest** — apply RUBRIC.md's *feasibility*
+  dimension and its *Load-bearing coverage* deep check: genuine
+  uncertainty only, verified blocks show *Observed == Expected*,
+  unverifiable assumptions flagged (not faked), and zero verified blocks
+  is fine when nothing is genuinely uncertain.
 - [ ] **Unknowns flagged** — every `:warning: needs human input` has a
   one-line note; clarifying questions are grouped, not scattered.
 - [ ] **Consistency** — the doc set agrees with itself, along three axes.
@@ -60,17 +61,11 @@ with a one-line reason for any fail:
     another file makes *contingent*, and no behaviour described two ways
     (e.g. "disabled in seconds, no redeploy" flat in the Overview but
     flagged contingent in feasibility/plan). Name the two spots.
-  - *Core coherence (idea + constraints)* — the plan's core is the
-    *guiding idea* (*Preferred*) plus the *Invariants & constraints*. Flag
-    a detail that **drifts from the guiding idea** — no longer serves it,
-    or quietly pursues a different approach than *Preferred* — just as you
-    flag one that contradicts a constraint. If the feature has real
-    non-negotiables, *Invariants & constraints* is declared and short,
-    each names how it's checked, and details reference the core rather
-    than restate it.
-- [ ] **Brevity** — no detail that doesn't change a decision; non-load-
-  bearing material is pushed out of band and referenced, not restated.
-  Flag bloat that buries the load-bearing core.
+  - *Core coherence* — per RUBRIC.md's *Core coherence (idea +
+    constraints)* deep check: flag a detail that drifts from the guiding
+    idea (*Preferred*) or contradicts an *Invariants & constraints*.
+- [ ] **Brevity** — per RUBRIC.md's *Brevity* check: flag detail that
+  doesn't change a decision and bloat that buries the load-bearing core.
 
 ### 2. Scorecard
 

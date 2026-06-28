@@ -62,9 +62,8 @@ From the user's project root:
 cp -r <RITA-ROOT>/templates <component>/docs/features/<TICKET-ID>-<slug>/
 ```
 
-Set the frontmatter in `README.md` (Ticket, `Status: Plan`,
-`Last reviewed: <today>`).  Don't fill in the body yet —
-later phases direct what to fill when.
+Then set up the new folder per how-to.md §1 (the `README.md`
+frontmatter; don't fill in the body yet).
 
 ### D. Walk the six lifecycle phases
 
@@ -76,10 +75,12 @@ The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
     Why, Options considered + Preferred.
--   Phase 2 (*Feasibility check*) → one block per load-bearing
-    assumption in `feasibility.md`.  Don't continue if any
-    block has *Observed exit ≠ Expected exit* — loop back to
-    phase 1 with a different option.
+-   Phase 2 (*Feasibility check*) → a block only for the
+    *genuinely uncertain* load-bearing assumptions; many features
+    need none.  A check you *ran* that fails (*Observed ≠
+    Expected*) loops back to phase 1; an assumption you *can't*
+    verify is flagged, not blocked — write the full plan anyway
+    (see how-to §2).
 -   Phase 3 (*Plan review*) → fill in `plan.md`, then run the
     three-pass review.  The agent self-review pass is your job;
     do it before asking the human to look at anything.

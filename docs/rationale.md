@@ -97,8 +97,8 @@ The format makes the check non-optional.
 The same instinct has a failure mode worth naming: a feasibility
 check is only worth writing when the outcome is genuinely
 *uncertain* — typically because it depends on something external
-(a version's behaviour, an API, a platform, real data, a service
-you don't own).  When a feature is self-contained and built on
+(see [`how-to.md#2-feasibility-check`](how-to.md#2-feasibility-check)
+for what external uncertainty covers).  When a feature is self-contained and built on
 well-understood in-house mechanics, agents (being eager to look
 rigorous) tend to *prototype the implementation and unit-test it*,
 then file that as feasibility.  Those blocks verify nothing anyone
@@ -195,35 +195,34 @@ operational list lives in
 that while you work; come here for the *why* behind each rule.
 
 -   **Ground every API/schema proposal in the closest existing
-    precedent.**  Before proposing a new event type, column,
-    enum, or endpoint, find the feature that did the most similar
-    thing and match its shape unless you have a specific reason
-    to diverge.  Divergence is fine; *unintentional* divergence
-    is rework.  Naming a precedent in the plan also gives the
-    reviewer a concrete thing to compare against.
+    precedent.**  The cost this avoids is *unintentional*
+    divergence — deliberate divergence is fine, but the kind you
+    didn't notice is rework, and a named precedent gives the
+    reviewer a concrete thing to compare against.  (Operational
+    form in [`how-to.md#drafting-rules`](how-to.md#drafting-rules).)
 
--   **Enumerate states around any precondition.**  When a new
-    action only applies in "some" states, list every state the
-    object can be in and decide allowed/rejected for each.  The
-    obvious state usually has an equally-valid twin that's easy
-    to miss (e.g. "enabled only in test" and "disabled in all
-    feeds" both describe a release that never progressed).
+-   **Enumerate states around any precondition.**  Why it's a rule
+    and not an instinct: the obvious state usually has an
+    equally-valid twin that's easy to miss — "enabled only in test"
+    and "disabled in all feeds" both describe a release that never
+    progressed, and a plan that handles only the first silently
+    drops the second.  (The rule is in
+    [`how-to.md#drafting-rules`](how-to.md#drafting-rules).)
 
--   **Treat external services as hard scope boundaries.**  If a
-    change would require coordinated work in another service
-    (a downstream API consumer, a partner's codebase, a separate
-    deployment), name what *we* expose and stop there.  Don't
-    pull their change set into our plan.  External services can
-    be listed under dependencies, but they are not implementation
-    steps.
+-   **Treat external services as hard scope boundaries.**  A plan
+    that pulls another service's change set into its own
+    implementation steps can no longer be estimated, reviewed, or
+    shipped on its own — that's the cost the boundary buys back.
+    (Operational form in
+    [`how-to.md#drafting-rules`](how-to.md#drafting-rules).)
 
 -   **For every data consumer, ask both "hide" and "keep
-    visible".**  Changes that affect visibility usually affect
-    some consumers and not others.  List the consumers that must
-    hide the new state AND the consumers that must still show
-    it.  Downstream tooling (batch jobs, reporting services,
-    UI clients) often has different requirements than the
-    request-path API.
+    visible".**  The trap is asymmetry: downstream tooling (batch
+    jobs, reporting services, UI clients) often needs the opposite
+    of what the request-path API needs, so a visibility change
+    that's correct for one breaks the other unless both sides are
+    named.  (The rule is in
+    [`how-to.md#drafting-rules`](how-to.md#drafting-rules).)
 
 -   **Don't add a feature flag by reflex.**  Ship directly when
     the change is admin-only, has no client-facing behaviour, and
@@ -249,11 +248,11 @@ that while you work; come here for the *why* behind each rule.
     ```
 
 -   **Make Definition-of-Done items verifiable from the doc
-    alone.**  Each checkbox should name the artifact — the table
-    and column, the URL, the file, the endpoint, the UI element —
-    so a reviewer at T+30 can walk the list without reopening the
-    MR to find out what was meant.  Vague verbs ("added",
-    "implemented", "works") hide the thing being checked.
+    alone.**  Naming the artifact is what lets a reviewer at T+30
+    walk the list without reopening the MR to find out what was
+    meant — the rule and its artifact list are in
+    [`how-to.md#drafting-rules`](how-to.md#drafting-rules).  The
+    contrast makes the point:
 
     Bad:
     ```

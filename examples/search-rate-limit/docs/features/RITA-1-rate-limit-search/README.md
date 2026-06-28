@@ -1,7 +1,7 @@
 # RITA-1: Rate-limit the public search endpoint
 
 > Status: Plan
-> Last reviewed: 2026-06-21
+> Last reviewed: 2026-06-28
 > Ticket: RITA-1
 
 | Document                                 | Purpose                            |
