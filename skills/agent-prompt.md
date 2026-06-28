@@ -76,10 +76,12 @@ The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
     Why, Options considered + Preferred.
--   Phase 2 (*Feasibility check*) → one block per load-bearing
-    assumption in `feasibility.md`.  Don't continue if any
-    block has *Observed exit ≠ Expected exit* — loop back to
-    phase 1 with a different option.
+-   Phase 2 (*Feasibility check*) → a block only for the
+    *genuinely uncertain* load-bearing assumptions; many features
+    need none.  A check you *ran* that fails (*Observed ≠
+    Expected*) loops back to phase 1; an assumption you *can't*
+    verify is flagged, not blocked — write the full plan anyway
+    (see how-to §2).
 -   Phase 3 (*Plan review*) → fill in `plan.md`, then run the
     three-pass review.  The agent self-review pass is your job;
     do it before asking the human to look at anything.
