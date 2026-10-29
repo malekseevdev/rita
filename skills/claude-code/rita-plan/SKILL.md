@@ -105,7 +105,8 @@ The planning loop (phases 1-3) iterates on failure:
         to run `rita-review` on the folder, so the review reads what's on
         the page, not your authoring rationale.  It only *reviews* —
         returns a scorecard + improvements, edits nothing; *you* then
-        apply them.
+        apply them, and address budget warnings by moving decisions into
+        ADRs first (how-to §3).
     -   **Invocation** — normally `/rita-review <folder>`, or
         `/<prefix>rita-review <folder>` under this skill's prefix; if the
         subagent can't invoke the skill, it reads `rita-review`'s

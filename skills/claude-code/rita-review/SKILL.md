@@ -64,8 +64,11 @@ the scorecard (§2) then scores those same criteria 0–5.
   - *Core coherence* — per RUBRIC.md's *Core coherence (idea +
     constraints)* deep check: flag a detail that drifts from *The model*
     or contradicts an *Invariants & constraints*.
-- [ ] **Brevity** — per RUBRIC.md's *Brevity* check: flag detail that
-  doesn't change a decision and bloat that buries the load-bearing core.
+- [ ] **Model** — per RUBRIC.md's *Model* check: *The model* exists, fits
+  one screen, and states the solution on its own.
+- [ ] **Brevity** — per RUBRIC.md's *Brevity* check: no detail is left
+  that doesn't change a decision, and each ADR is self-sufficient. A file
+  over its size budget is reported as a **warning**, not a failed item.
 
 ### 2. Scorecard
 

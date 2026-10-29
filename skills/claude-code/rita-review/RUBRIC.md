@@ -86,6 +86,11 @@ improvements:
 - **Rollback soundness** — the rollback strategy actually addresses the
   failure modes *Concerns* names, and any "fastest path" claim is real
   (a flag flip is seconds; a data migration is not reversible by a flip).
+- **Model** — README has a *The model* section that states the solution
+  on one screen: a handful of rules, a data or read path, or a state
+  table. You can explain the solution from it alone, and nothing else in
+  the doc set contradicts it. Missing, or only assemblable from *Options*,
+  *Impact* and `plan.md`: cap *options* at 3 and make it an improvement.
 - **Options → Preferred soundness** — *Preferred* follows from the stated
   trade-offs; rejected options are rejected for reasons that hold; it's
   the right choice, not merely the most-obvious-from-the-code one.
@@ -101,6 +106,17 @@ improvements:
   the load-bearing core and invites drift. Reward plans that push
   non-load-bearing material out of band and reference it; dock padding and
   duplicated prose (which also drive the cross-file inconsistencies above).
+  Check each file against its size budget in lines: `README.md` 250
+  (counting only above the "filled in during implementation" marker),
+  `plan.md` 150, any other file 100. Count the lines, or use
+  `drift_check.py --budget` where available. A file over budget with no
+  `<!-- rita-budget: N — reason -->` line is a **warning, not a
+  failure**: don't dock a score for size alone (judge the bloat itself, as
+  above), but report it, and list the fix as an improvement — first moving
+  inline design decisions into ADRs under `decisions/`, then trimming.
+  Each ADR must be **self-sufficient**: its problem, decision and
+  trade-offs readable from that file alone. An ADR that only makes sense
+  with the README open is a gap.
 
 ## Total → grade
 

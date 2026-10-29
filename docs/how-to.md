@@ -12,6 +12,7 @@ Don't duplicate prose across docs.
 
 | Information | Owns it |
 |---|---|
+| A design decision too big for the README: its context, the decision, alternatives, consequences | `decisions/NNNN-<slug>.md` (an ADR, evergreen), indexed one line each in `README.md` |
 | Invariants & constraints, what the change is, options considered, the model (the preferred solution itself), impact (audience + affected systems), how it works, system interactions, configuration | `README.md` |
 | Load-bearing assumptions and their verifications | `feasibility.md` |
 | Implementation steps, dependencies, deployment, rollback, DoD | `plan.md` (deleted at ship time) |
@@ -47,7 +48,28 @@ rule lives in [`rationale.md#drafting-pitfalls`](rationale.md#drafting-pitfalls)
     swamps the load-bearing decisions.  Keep only what's load-bearing in
     the doc; push the rest out of band — to code, tests, or the ticket —
     and reference it.  Detail that doesn't change a decision doesn't
-    belong in the plan.
+    belong in the plan.  Each file has a **size budget**, in lines:
+
+    | File | Budget |
+    |---|---|
+    | `README.md` | 250 |
+    | `plan.md` | 150 |
+    | any other file | 100 |
+
+    `README.md` counts only the lines above the "filled in during
+    implementation" marker; each ADR under `decisions/` is an "other
+    file".  Over budget is a **warning, not a blocker**.  To clear it,
+    first **move decisions out**: each decision that needs more than a few
+    lines becomes an ADR in `decisions/NNNN-<slug>.md` (Status, Context,
+    Decision, Alternatives considered, Consequences), and the README keeps
+    the model plus a one-line index entry per ADR.  **Each ADR is
+    self-sufficient:** a reader understands the problem, the decision and
+    its trade-offs from that file alone, and links to the README or other
+    ADRs only for further reading.  An ADR is Proposed until the plan is
+    approved; a decision that changes later gets a new ADR that supersedes
+    the old one.  A file can also acknowledge the warning by stating why it
+    needs more, as `<!-- rita-budget: N — reason -->`.
+    `drift_check.py --budget` lists every file over its budget.
 -   **Keep details subordinate to the core.**  The plan's core is the
     *guiding idea*, stated in *The model*, plus the *Invariants &
     constraints*.  Every detail is a move in service of the idea and must
@@ -340,7 +362,10 @@ improves it in a short loop — no human in the loop yet:
     checking the docs against the implementation is `rita-delta`, run
     during implementation and maintenance; see Phase 6.)
 2.  **Improve.**  Address the improvements and any failed checklist
-    items — edit the docs, don't argue with the review.
+    items — edit the docs, don't argue with the review.  For each
+    **budget** warning (see *Drafting rules*), move decisions into ADRs
+    and trim back to the model where that helps; a warning that remains is
+    not a blocker.
 3.  **Stop after one revision.**  Cap the loop at **two plan iterations**
     — the initial draft plus a single review-and-fix pass — then hand to
     the human passes even if minor improvements remain (author and peer

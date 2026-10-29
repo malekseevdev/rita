@@ -206,6 +206,19 @@ So the model gets its own short section, and it is approved together
 with the constraints, before anything is built on it.  A one-screen model
 is cheap to change; the details are written once it holds.
 
+Brevity needs the same treatment.  "As brief as possible" was a rule
+nothing measured, and the same plan reached 1,700 lines before anyone
+said stop.  A size budget per file turns it into detection: going over is
+not forbidden, but it is visible.  A README usually outgrows its budget
+because design decisions sit inline with their alternatives.  Those
+already have a well-known home, the architecture decision record, so the
+first remedy is to move each one into its own ADR inside the feature
+folder and keep a one-line index; the feature stays the unit.  A stated
+reason for staying over budget is the last resort.  The budget warns;
+it doesn't block, because some features are genuinely big.  An ADR moved
+out of the README has to stand alone: one that only makes sense with the
+README open has just moved the bloat.
+
 ## Drafting pitfalls
 
 These are lessons from past plan reviews.  They apply equally to
