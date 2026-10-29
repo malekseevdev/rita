@@ -12,6 +12,10 @@
 #              --fail-after 0, exit 0 under a generous threshold.
 #   3. Refs — with --refs, a documented identifier present in code is not
 #             flagged; one absent from code is surfaced as a candidate.
+#   4. Budget — with --budget, lines below README's implementation marker
+#               don't count, an over-budget ADR is reported, and a stated
+#               rita-budget line raises that file's budget.
+#   5. The budget numbers in the script, how-to and the rubric agree.
 #
 # It also sanity-checks that the committed worked example parses clean:
 # it's a Plan with no linked code, so drift_check.py reports OK on it.
@@ -177,6 +181,55 @@ if grep -q '`WIDGET_SCALE_FACTOR`' <<<"$REFS_OUT"; then
 fi
 set +x
 echo "PASS phase 3: --refs flags absent identifiers and spares present ones"
+
+
+# --- Phase 4: size budget (--budget) ----------------------------------
+# README counts only above the implementation marker; a decision file has the
+# default budget; a stated rita-budget line raises a file's budget.
+FOLDER="$(dirname "$DOC_REL")"
+run_budget() {
+  set +e
+  CHECK_OUT="$(python3 "$CHECK_PY" --root "$WORK_DIR" --budget 2>&1)"
+  CHECK_RC=$?
+  set -e
+  if [[ $SHOW_OUTPUT -eq 1 ]]; then
+    echo "----- drift_check.py --root \$WORK_DIR --budget (exit $CHECK_RC) -----"
+    echo "$CHECK_OUT"; echo
+  fi
+}
+set -x
+run_budget
+[[ $CHECK_RC -eq 0 ]] || fail "phase 4a: --budget is advisory and should exit 0, got $CHECK_RC"
+grep -q "within budget" <<<"$CHECK_OUT" || fail "phase 4a: a short folder should be within budget"
+
+{ printf '\n<!-- Sections below are filled in during implementation: -->\n'; seq 1 400; } >> "$DOC_REL"
+run_budget
+grep -q "over budget" <<<"$CHECK_OUT" && fail "phase 4b: lines below the implementation marker must not count"
+
+mkdir -p "$FOLDER/decisions"
+seq 1 120 > "$FOLDER/decisions/0001-big.md"
+run_budget
+grep -q "decisions/0001-big.md  120/100" <<<"$CHECK_OUT" || fail "phase 4c: an ADR over 100 lines should be reported"
+
+{ echo '<!-- rita-budget: 130 — the full fallback matrix -->'; seq 1 120; } > "$FOLDER/decisions/0001-big.md"
+run_budget
+grep -q "0001-big.md" <<<"$CHECK_OUT" && fail "phase 4d: a file within its stated budget must not be reported"
+set +x
+echo "PASS phase 4: --budget counts the right lines, flags overflow, honours a stated budget"
+
+# --- Phase 5: the budget numbers agree everywhere ---------------------
+# docs/how-to.md owns them; the script and the standalone rubric repeat them.
+HOWTO="$REPO_ROOT/docs/how-to.md"
+RUBRIC="$REPO_ROOT/skills/claude-code/rita-review/RUBRIC.md"
+read -r B_README B_PLAN B_OTHER < <(cd "$REPO_ROOT/scripts" && python3 -c \
+  'import drift_check as d; print(d.BUDGETS["README.md"], d.BUDGETS["plan.md"], d.DEFAULT_BUDGET)')
+grep -q "| \`README.md\` | $B_README |" "$HOWTO" || fail "phase 5: how-to README budget != script ($B_README)"
+grep -q "| \`plan.md\` | $B_PLAN |"     "$HOWTO" || fail "phase 5: how-to plan budget != script ($B_PLAN)"
+grep -q "| any other file | $B_OTHER |"   "$HOWTO" || fail "phase 5: how-to default budget != script ($B_OTHER)"
+tr '\n' ' ' < "$RUBRIC" | tr -s ' ' | grep -q "\`README.md\` $B_README" || fail "phase 5: rubric README budget != script"
+tr '\n' ' ' < "$RUBRIC" | tr -s ' ' | grep -q "\`plan.md\` $B_PLAN"     || fail "phase 5: rubric plan budget != script"
+tr '\n' ' ' < "$RUBRIC" | tr -s ' ' | grep -q "any other file $B_OTHER"  || fail "phase 5: rubric default budget != script"
+echo "PASS phase 5: budget numbers agree across the script, how-to and the rubric"
 
 echo
 echo "OK: all drift-detection assertions passed."

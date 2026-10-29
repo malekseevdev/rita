@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rita drift detection.
 
-Two passes over <root>/**/docs/features/*/ feature folders:
+Up to three passes over <root>/**/docs/features/*/ feature folders:
 
   * Date drift (always) — reports docs whose `Last reviewed:` date is
     older than the most recent commit touching any code file the doc
@@ -13,14 +13,18 @@ Two passes over <root>/**/docs/features/*/ feature folders:
     verify*, not confirmed gaps: an identifier can be built at runtime
     (a metric name assembled from a prefix, a flag read via a constant)
     and so be real yet unfindable by literal search.
+  * Size budget (--budget) — reports Markdown files over their line
+    budget (docs/how-to.md, drafting rules): README.md counts only above
+    the "filled in during implementation" marker.  A file that states
+    `<!-- rita-budget: N — reason -->` is held to N instead.
 
 Usage:
-    python scripts/drift_check.py [--root .] [--fail-after DAYS] [--refs]
+    python scripts/drift_check.py [--root .] [--fail-after DAYS] [--refs] [--budget]
 
 Exit codes:
     0 — no date drift beyond the threshold
     1 — at least one doc is stale beyond --fail-after
-        (the --refs pass is advisory and never changes the exit code)
+        (the --refs and --budget passes are advisory and never change it)
 """
 
 from __future__ import annotations
@@ -37,6 +41,13 @@ from pathlib import Path
 # (#section) are stripped to the file portion.
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)#]+)(?:#[^)]*)?\)")
 LAST_REVIEWED_RE = re.compile(r"^>?\s*Last reviewed:\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
+
+# Size budgets in lines; docs/how-to.md (drafting rules) owns these numbers,
+# and tests/e2e/test_drift.sh checks the two agree.
+BUDGETS = {"README.md": 250, "plan.md": 150}
+DEFAULT_BUDGET = 100
+IMPL_MARKER_RE = re.compile(r"filled in during implementation", re.IGNORECASE)
+BUDGET_OVERRIDE_RE = re.compile(r"<!--\s*rita-budget:\s*(\d+)\s*[—–-]?\s*(.*?)\s*-->")
 
 
 def find_feature_docs(root: Path) -> list[Path]:
@@ -195,6 +206,40 @@ def report_refs(docs: list[Path], root: Path) -> None:
             print(f"      └─ `{token}`  ({where}) — verify; may be runtime-assembled")
 
 
+def counted_lines(path: Path) -> int:
+    """Lines that count against the budget: README.md stops at the implementation marker."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if path.name == "README.md":
+        for i, line in enumerate(lines):
+            if IMPL_MARKER_RE.search(line):
+                return i
+    return len(lines)
+
+
+def report_budget(docs: list[Path], root: Path) -> None:
+    """Print the size-budget pass for each feature folder."""
+    for folder in sorted({doc.parent for doc in docs}):
+        rel = folder.relative_to(root)
+        files = sorted(folder.rglob("*.md"))
+        over = []
+        for path in files:
+            budget = BUDGETS.get(path.name, DEFAULT_BUDGET)
+            reason = ""
+            match = BUDGET_OVERRIDE_RE.search(path.read_text(encoding="utf-8", errors="replace"))
+            if match:
+                budget, reason = int(match.group(1)), match.group(2)
+            count = counted_lines(path)
+            if count > budget:
+                over.append((path, count, budget, reason))
+        if not over:
+            print(f"BUDGET {rel}: all {len(files)} file(s) within budget.")
+            continue
+        print(f"BUDGET {rel}: warning — {len(over)} of {len(files)} file(s) over budget")
+        for path, count, budget, reason in over:
+            hint = f"stated budget exceeded ({reason})" if reason else "move decisions into ADRs, then trim"
+            print(f"      └─ {path.relative_to(root)}  {count}/{budget} lines — {hint}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", maxsplit=1)[0])
     parser.add_argument("--root", default=".", help="Root directory to scan (default: cwd)")
@@ -209,6 +254,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Also run the referential-integrity pass (documented identifiers "
         "not found in code).  Advisory — never changes the exit code.",
+    )
+    parser.add_argument(
+        "--budget",
+        action="store_true",
+        help="Also report Markdown files over their line budget.  Advisory — never changes the exit code.",
     )
     args = parser.parse_args(argv)
 
@@ -247,6 +297,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.refs:
         report_refs(docs, root)
+
+    if args.budget:
+        report_budget(docs, root)
 
     return exit_code
 
