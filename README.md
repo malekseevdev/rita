@@ -172,7 +172,7 @@ beyond Claude Code are TODO.
     Once a plan exists, grade it with the **`rita-review`** skill:
 
     ```
-    /rita-review docs/features/RITA-1-rate-limit-search
+    /rita-review search-service/docs/features/RITA-1-search-rate-limit
     ```
 
     — a rubric scorecard (8 dimensions + letter grade) with
@@ -183,7 +183,7 @@ beyond Claude Code are TODO.
     skill:
 
     ```
-    /rita-delta docs/features/RITA-1-rate-limit-search
+    /rita-delta search-service/docs/features/RITA-1-search-rate-limit
     ```
 
     It runs the drift script as a cheap first pass, then reads the
