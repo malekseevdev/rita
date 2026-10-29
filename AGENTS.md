@@ -44,7 +44,7 @@ Load-bearing, and not (fully) stated elsewhere:
 - **Brevity, applied to our own docs.**  As brief as possible, never
   briefer.  Push non-load-bearing detail out of band and reference it; a
   short doc has no patchwork problem.
-- **The plan's core is a pair.**  The guiding idea (*Preferred*) plus the
+- **The plan's core is a pair.**  The guiding idea (*The model*) plus the
   invariants & constraints.  Every detail is subordinate to both —
   constraint → check, idea → coherence.
 - **Review skills are read-only.**  `rita-review` and `rita-delta` detect

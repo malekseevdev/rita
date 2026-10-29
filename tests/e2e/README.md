@@ -103,7 +103,7 @@ folder to compare quality across models or against the checked-in
 reference.
 
 ```bash
-tests/e2e/rank_plan.sh examples/search-rate-limit/docs/features/RITA-1-rate-limit-search
+tests/e2e/rank_plan.sh examples/search-rate-limit/search-service/docs/features/RITA-1-search-rate-limit
 # → ┌─ Rita plan scorecard … TOTAL 36/40 (90%) grade A
 ```
 

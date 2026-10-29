@@ -172,7 +172,7 @@ beyond Claude Code are TODO.
     Once a plan exists, grade it with the **`rita-review`** skill:
 
     ```
-    /rita-review docs/features/RITA-1-rate-limit-search
+    /rita-review search-service/docs/features/RITA-1-search-rate-limit
     ```
 
     — a rubric scorecard (8 dimensions + letter grade) with
@@ -183,7 +183,7 @@ beyond Claude Code are TODO.
     skill:
 
     ```
-    /rita-delta docs/features/RITA-1-rate-limit-search
+    /rita-delta search-service/docs/features/RITA-1-search-rate-limit
     ```
 
     It runs the drift script as a cheap first pass, then reads the
@@ -196,7 +196,7 @@ The full procedural reference the agent follows is in
 
 Rita is graduated: the skill drafts the full feature-folder
 artifact set, but you choose how much of it to engage with on a
-given ticket.  Reviewing `README.md` (Options + Preferred) and
+given ticket.  Reviewing `README.md` (*The model* and Options) and
 `feasibility.md` (load-bearing assumptions) is the minimum that
 delivers Rita's core value; the rest of the doc set — plan,
 test-cases, metrics, runbook — adds operational depth when the

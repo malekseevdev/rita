@@ -74,7 +74,7 @@ Follow `<RITA-ROOT>/docs/how-to.md` sections 1-6.  Apply the
 The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
-    Why, Options considered + Preferred.
+    Why, Options considered + Preferred, *The model*.
 -   Phase 2 (*Feasibility check*) → a block only for the
     *genuinely uncertain* load-bearing assumptions; many features
     need none.  A check you *ran* that fails (*Observed ≠

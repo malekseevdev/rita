@@ -12,7 +12,8 @@ Don't duplicate prose across docs.
 
 | Information | Owns it |
 |---|---|
-| Invariants & constraints, what the change is, options considered, preferred solution + why, impact (audience + affected systems), how it works, system interactions, configuration | `README.md` |
+| A design decision too big for the README: its context, the decision, alternatives, consequences | `decisions/NNNN-<slug>.md` (an ADR, evergreen), indexed one line each in `README.md` |
+| Invariants & constraints, what the change is, options considered, the model (the preferred solution itself), impact (audience + affected systems), how it works, system interactions, configuration | `README.md` |
 | Load-bearing assumptions and their verifications | `feasibility.md` |
 | Implementation steps, dependencies, deployment, rollback, DoD | `plan.md` (deleted at ship time) |
 | Symptoms → diagnostics → fixes; operator one-shots | `runbook.md` |
@@ -47,15 +48,42 @@ rule lives in [`rationale.md#drafting-pitfalls`](rationale.md#drafting-pitfalls)
     swamps the load-bearing decisions.  Keep only what's load-bearing in
     the doc; push the rest out of band — to code, tests, or the ticket —
     and reference it.  Detail that doesn't change a decision doesn't
-    belong in the plan.
+    belong in the plan.  Each file has a **size budget**, in lines:
+
+    | File | Budget |
+    |---|---|
+    | `README.md` | 250 |
+    | `plan.md` | 150 |
+    | any other file | 100 |
+
+    `README.md` counts only the lines above the "filled in during
+    implementation" marker; each ADR under `decisions/` is an "other
+    file".  Over budget is a **warning, not a blocker**.  To clear it,
+    first **move decisions out**: each decision that needs more than a few
+    lines becomes an ADR in `decisions/NNNN-<slug>.md` (Status, Context,
+    Decision, Alternatives considered, Consequences), and the README keeps
+    the model plus a one-line index entry per ADR.  **Each ADR is
+    self-sufficient:** a reader understands the problem, the decision and
+    its trade-offs from that file alone, and links to the README or other
+    ADRs only for further reading.  An ADR is Proposed until the plan is
+    approved; a decision that changes later gets a new ADR that supersedes
+    the old one.  A file can also acknowledge the warning by stating why it
+    needs more, as `<!-- rita-budget: N — reason -->`.
+    `drift_check.py --budget` lists every file over its budget.
 -   **Keep details subordinate to the core.**  The plan's core is the
-    *guiding idea* (the *Preferred* approach) plus the *Invariants &
+    *guiding idea*, stated in *The model*, plus the *Invariants &
     constraints*.  Every detail is a move in service of the idea and must
     not contradict a constraint — a detail that drifts from the idea, or
     breaks a constraint, is a bug in the detail, not a new fact.  State
     each constraint as something *checkable* (a test, a DoD item, a
     `drift_check --refs` grep) and reference the core rather than
     restating it.
+-   **Express the model, not the details.**  *The model* states the
+    solution as a handful of rules, a data or read path, or a state
+    table, and fits on one screen.  Detail that a reader can derive from
+    it, or that only the implementer needs, goes to `plan.md`, the tests
+    or the code.  When the model changes, rewrite it first and the
+    details after.
 -   **Ground every API/schema proposal in the closest existing
     precedent.**  Name the precedent in the plan so the reviewer
     has something concrete to compare against.  Divergence is
@@ -111,20 +139,23 @@ Read the ticket.  Then fill in:
     where "I considered B but rejected it because X" lives.
     Always include *Do nothing* — it forces the work to justify
     itself.
+-   `README.md` *The model* — the preferred option, stated as the
+    solution itself (see *Express the model, not the details* in the
+    drafting rules).  For a small feature it is a sentence or two.
 -   `README.md` *Impact* — which user segments and which systems
     this feature affects.  This is evergreen; on-call and future
     modifiers will read it.
 
-### Confirm the constraints before continuing
+### Confirm the model and the constraints before continuing
 
 The *Invariants & constraints* are the plan's constitution — everything
 downstream is built to preserve them, so a misread here is as expensive
-as a wrong feasibility assumption.  Before going further, **surface the
-*Invariants & constraints* (and the *Preferred* option) to the human and
-get an explicit approve-or-correct.**  The user owns the non-negotiables:
-they carry institutional knowledge the codebase can't reveal — a contract
-you don't know about, a limit that was never written down, a "we can
-never break X."
+as a wrong feasibility assumption, and so is a misread of the solution.
+Before going further, **surface the *Invariants & constraints* and *The
+model* to the human and get an explicit approve-or-correct.**  The user
+owns the non-negotiables: they carry institutional knowledge the codebase
+can't reveal — a contract you don't know about, a limit that was never
+written down, a "we can never break X."
 
 -   Present each constraint crisply and ask *approve / edit / add one?*
     Fold this into the **same pass** as your Phase-1 clarifying questions
@@ -136,9 +167,9 @@ never break X."
     the constraints `:warning: needs human input — confirm before build`
     and proceed, exactly as for an unverifiable feasibility assumption.
 
-A constraint approved here is the thing later review (and `rita-review`)
-holds the plan against; changing one afterwards is a deliberate act that
-re-opens review, not a side effect of a fix.
+A constraint or model approved here is the thing later review (and
+`rita-review`) holds the plan against; changing one afterwards is a
+deliberate act that re-opens this checkpoint, not a side effect of a fix.
 
 Then move to section 2.  Don't fill in `plan.md` yet — feasibility may
 invalidate the preferred approach.
@@ -331,7 +362,10 @@ improves it in a short loop — no human in the loop yet:
     checking the docs against the implementation is `rita-delta`, run
     during implementation and maintenance; see Phase 6.)
 2.  **Improve.**  Address the improvements and any failed checklist
-    items — edit the docs, don't argue with the review.
+    items — edit the docs, don't argue with the review.  For each
+    **budget** warning (see *Drafting rules*), move decisions into ADRs
+    and trim back to the model where that helps; a warning that remains is
+    not a blocker.
 3.  **Stop after one revision.**  Cap the loop at **two plan iterations**
     — the initial draft plus a single review-and-fix pass — then hand to
     the human passes even if minor improvements remain (author and peer
@@ -354,7 +388,7 @@ to discover the questions on their own.  After self-review,
 present the author with the doc set *and* the list of questions
 below, framed as the prompts they should answer before approving:
 
--   Does *Preferred* match what you actually want?  Did I reach
+-   Does *The model* match what you actually want?  Did I reach
     for the most-obvious-from-the-code option rather than the
     right one?
 -   Are the *Options considered* honest — including alternatives
@@ -390,7 +424,7 @@ review surface).  **The agent posts the review prompts in the MR
 description or as a top-level comment** so the peer reviewer
 sees them up front rather than guessing what to look at:
 
--   Can you explain the preferred solution from `README.md` alone?
+-   Can you explain the solution from *The model* alone?
 -   Are there options that weren't considered?
 -   Does every load-bearing assumption have a block in
     `feasibility.md` with *Observed exit == Expected exit*?
@@ -438,7 +472,7 @@ review):
 
 -   [ ] Plan was reviewed and approved before implementation started.
 -   [ ] `README.md` has all shipped-state sections including
-    *Options considered* and *Preferred*.
+    *Options considered*, *Preferred* and *The model*.
 -   [ ] `feasibility.md` has all load-bearing assumptions verified
     (*Observed exit == Expected exit*) and is frozen.
 -   [ ] `plan.md` is deleted.

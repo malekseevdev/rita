@@ -22,7 +22,10 @@ feature scores 1–2.
 
 1. **options** — Options table with honest pros/cons, includes
    *Do nothing*, and the *Preferred* choice is justified (not just the
-   most-obvious-from-the-code option).
+   most-obvious-from-the-code option).  *The model* states it so a
+   reviewer can explain the solution from that section alone; a model
+   that has to be assembled from *Options*, *Impact* and `plan.md` caps
+   this at 3.
 2. **feasibility** — The *genuinely uncertain* load-bearing assumptions
    are identified and verified — uncertainty that's usually external (a
    library/version, an API, a platform, real data shape/scale, a service
@@ -83,13 +86,18 @@ improvements:
 - **Rollback soundness** — the rollback strategy actually addresses the
   failure modes *Concerns* names, and any "fastest path" claim is real
   (a flag flip is seconds; a data migration is not reversible by a flip).
+- **Model** — README has a *The model* section that states the solution
+  on one screen: a handful of rules, a data or read path, or a state
+  table. You can explain the solution from it alone, and nothing else in
+  the doc set contradicts it. Missing, or only assemblable from *Options*,
+  *Impact* and `plan.md`: cap *options* at 3 and make it an improvement.
 - **Options → Preferred soundness** — *Preferred* follows from the stated
   trade-offs; rejected options are rejected for reasons that hold; it's
   the right choice, not merely the most-obvious-from-the-code one.
 - **Core coherence (idea + constraints)** — the plan's core is the
-  *guiding idea* (*Preferred*) plus the *Invariants & constraints*. No
-  detail should drift from the guiding idea (quietly pursue a different
-  approach than *Preferred*) or contradict a constraint — details
+  *guiding idea* (*The model*) plus the *Invariants & constraints*. No
+  detail should drift from the model (quietly pursue a different
+  approach than *The model* states) or contradict a constraint — details
   reference the core, not restate it. If the feature has real
   non-negotiables, an *Invariants & constraints* block declares them and
   each names how it's checked; a missing or prose-only constitution where
@@ -98,6 +106,17 @@ improvements:
   the load-bearing core and invites drift. Reward plans that push
   non-load-bearing material out of band and reference it; dock padding and
   duplicated prose (which also drive the cross-file inconsistencies above).
+  Check each file against its size budget in lines: `README.md` 250
+  (counting only above the "filled in during implementation" marker),
+  `plan.md` 150, any other file 100. Count the lines, or use
+  `drift_check.py --budget` where available. A file over budget with no
+  `<!-- rita-budget: N — reason -->` line is a **warning, not a
+  failure**: don't dock a score for size alone (judge the bloat itself, as
+  above), but report it, and list the fix as an improvement — first moving
+  inline design decisions into ADRs under `decisions/`, then trimming.
+  Each ADR must be **self-sufficient**: its problem, decision and
+  trade-offs readable from that file alone. An ADR that only makes sense
+  with the README open is a gap.
 
 ## Total → grade
 

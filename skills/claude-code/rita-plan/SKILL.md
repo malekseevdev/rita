@@ -87,10 +87,10 @@ The planning loop (phases 1-3) iterates on failure:
 
 -   Phase 1 (*Plan options*) → fill in `README.md`'s Overview,
     Why, *Invariants & constraints*, Options considered + Preferred,
-    Impact.  **Then stop at the constraint-approval checkpoint: have the
-    human approve or correct the *Invariants & constraints* (and
-    Preferred) before Phase 2** — they're the plan's constitution.  See
-    how-to §1 *Confirm the constraints before continuing* for the
+    *The model*, Impact.  **Then stop at the checkpoint: have the
+    human approve or correct the *Invariants & constraints* and *The
+    model* before Phase 2** — they're the plan's core.  See how-to §1
+    *Confirm the model and the constraints before continuing* for the
     no-non-negotiables and headless cases.
 -   Phase 2 (*Feasibility check*) → verify only the *genuinely
     uncertain* (usually external) load-bearing assumptions — many
@@ -105,7 +105,8 @@ The planning loop (phases 1-3) iterates on failure:
         to run `rita-review` on the folder, so the review reads what's on
         the page, not your authoring rationale.  It only *reviews* —
         returns a scorecard + improvements, edits nothing; *you* then
-        apply them.
+        apply them, and address budget warnings by moving decisions into
+        ADRs first (how-to §3).
     -   **Invocation** — normally `/rita-review <folder>`, or
         `/<prefix>rita-review <folder>` under this skill's prefix; if the
         subagent can't invoke the skill, it reads `rita-review`'s
@@ -129,8 +130,8 @@ Once approved, the path is linear:
 When something is genuinely unknown, mark it
 `:warning: needs human input` with a one-line note.  Don't
 guess.  Group questions and ask the user in a single pass
-rather than scattering them.  Fold the Phase-1 constraint-approval
-checkpoint into this same pass — one interaction, before feasibility and
+rather than scattering them.  Fold the Phase-1 checkpoint (constraints
+and model) into this same pass — one interaction, before feasibility and
 `plan.md`.
 
 ## Boundaries
@@ -154,9 +155,8 @@ sentences plus the file diff.  Three artifacts deserve explicit
 surfacing rather than just the diff:
 
 -   At the end of *Plan options* (phase 1): emit the *Invariants &
-    constraints* and the *Preferred* option and ask the human to approve
-    or correct them — the constraint-approval checkpoint (see section D
-    and how-to §1).
+    constraints* and *The model* and ask the human to approve or correct
+    them — the Phase 1 checkpoint (see section D and how-to §1).
 -   At the end of *Feasibility check* (phase 2): emit each
     `feasibility.md` block you wrote, with its *Observed exit*
     and *Observed output*.  Feasibility blocks are the
