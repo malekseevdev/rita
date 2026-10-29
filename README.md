@@ -50,9 +50,12 @@ Four core moves:
   plan, not after days of implementation reveal that it isn't.
 - **Each fact lives in one file.**  README, feasibility, plan, runbook,
   metrics, test cases — six files, no overlap, no drift.
-- **Keep the plan's core legible.**  As brief as possible; the load-bearing
-  invariants and constraints live in one short, checkable block the details
-  stay subordinate to — so a growing plan resists decaying into patchwork.
+- **Keep the plan's core legible.**  The core is *the model* — the
+  solution itself, on one screen — plus the invariants and constraints,
+  and the human approves both before anything is built on them.  **If the
+  model is wrong, the whole plan is wrong.**  Everything else stays brief
+  and subordinate to the core, and a per-file size budget warns when it
+  doesn't — so a growing plan resists decaying into patchwork.
 - **Detect rot mechanically.**  Linked-code mtimes vs. doc review dates,
   re-executable feasibility commands, structural lint rules.  The discipline
   survives without anyone watching.
