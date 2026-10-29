@@ -62,8 +62,8 @@ the scorecard (§2) then scores those same criteria 0–5.
     (e.g. "disabled in seconds, no redeploy" flat in the Overview but
     flagged contingent in feasibility/plan). Name the two spots.
   - *Core coherence* — per RUBRIC.md's *Core coherence (idea +
-    constraints)* deep check: flag a detail that drifts from the guiding
-    idea (*Preferred*) or contradicts an *Invariants & constraints*.
+    constraints)* deep check: flag a detail that drifts from *The model*
+    or contradicts an *Invariants & constraints*.
 - [ ] **Brevity** — per RUBRIC.md's *Brevity* check: flag detail that
   doesn't change a decision and bloat that buries the load-bearing core.
 

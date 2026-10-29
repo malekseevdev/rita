@@ -22,7 +22,10 @@ feature scores 1–2.
 
 1. **options** — Options table with honest pros/cons, includes
    *Do nothing*, and the *Preferred* choice is justified (not just the
-   most-obvious-from-the-code option).
+   most-obvious-from-the-code option).  *The model* states it so a
+   reviewer can explain the solution from that section alone; a model
+   that has to be assembled from *Options*, *Impact* and `plan.md` caps
+   this at 3.
 2. **feasibility** — The *genuinely uncertain* load-bearing assumptions
    are identified and verified — uncertainty that's usually external (a
    library/version, an API, a platform, real data shape/scale, a service
@@ -87,9 +90,9 @@ improvements:
   trade-offs; rejected options are rejected for reasons that hold; it's
   the right choice, not merely the most-obvious-from-the-code one.
 - **Core coherence (idea + constraints)** — the plan's core is the
-  *guiding idea* (*Preferred*) plus the *Invariants & constraints*. No
-  detail should drift from the guiding idea (quietly pursue a different
-  approach than *Preferred*) or contradict a constraint — details
+  *guiding idea* (*The model*) plus the *Invariants & constraints*. No
+  detail should drift from the model (quietly pursue a different
+  approach than *The model* states) or contradict a constraint — details
   reference the core, not restate it. If the feature has real
   non-negotiables, an *Invariants & constraints* block declares them and
   each names how it's checked; a missing or prose-only constitution where

@@ -186,6 +186,26 @@ about epistemic limits*, not hand-waving.  Reviewers must read
 proxy-gap entries with the same weight as a fully-verified
 assumption.
 
+## Why the model comes first
+
+A plan's core is the guiding idea plus the constraints.  The constraints
+have always had a section and an approval gate; the guiding idea had
+neither.  It lived in one *Preferred* sentence, and the rest of it got
+reconstructed by the reader from *Options*, *Impact* and `plan.md`.  Two
+things follow from that.
+
+-   **The idea isn't reviewable.**  A reviewer can't approve a design
+    they have to assemble; they approve details and miss the shape.
+-   **Every change of idea rewrites the details.**  When the details are
+    written before the idea is agreed, each reversal costs a rewrite.
+    One plan changed its model five times in a day, and each time about
+    a thousand lines of options, rules and scenarios had to follow.  The
+    owner's eventual request was "express the model, not the details".
+
+So the model gets its own short section, and it is approved together
+with the constraints, before anything is built on it.  A one-screen model
+is cheap to change; the details are written once it holds.
+
 ## Drafting pitfalls
 
 These are lessons from past plan reviews.  They apply equally to

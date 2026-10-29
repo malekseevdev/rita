@@ -48,6 +48,13 @@ Always include "Do nothing" — it forces you to justify the work.
 shipping — readers in a year will want to know which alternatives
 were weighed.
 
+## The model
+
+The preferred solution itself, as a handful of rules, a data or read
+path, or a state table.  One screen at most; a sentence or two for a
+small feature.  Everything else in this doc set agrees with it.  When it
+changes, rewrite it first and the details after.
+
 ## Impact
 
 What this feature affects across the system and the business.
